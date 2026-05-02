@@ -150,6 +150,8 @@ static commandResult_t CMD_PowerSave(const void* context, const char* cmd, const
 		return PIN_FindPinIndexForRole(IOR_BL0937_CF, -1) != -1
 			|| PIN_FindPinIndexForRole(IOR_BL0937_CF1, -1) != -1
 			|| PIN_FindPinIndexForRole(IOR_BL0937_SEL, -1) != -1
+			|| PIN_FindPinIndexForRole(IOR_BL0937_SEL_n, -1) != -1
+			|| PIN_FindPinIndexForRole(IOR_HLW8112_SCSN, -1) != -1
 			|| PIN_FindPinIndexForRole(IOR_IRRecv, -1) != -1
 			|| PIN_FindPinIndexForRole(IOR_IRSend, -1) != -1
 			|| PIN_FindPinIndexForRole(IOR_IRRecv_nPup, -1) != -1
@@ -158,10 +160,16 @@ static commandResult_t CMD_PowerSave(const void* context, const char* cmd, const
 	}
 
 	if (bOn) {
-		BK_PS_LEVEL level = PS_RF_SLEEP_BIT;
-		if(!isBKSensitiveDriversRunning()) level |= PS_MCU_SLEEP_BIT;
-		else bOn = 0;
-		bk_wlan_power_save_set_level(level);
+		if (isBKSensitiveDriversRunning()) {
+			// RF sleep causes periodic high-current WiFi wakeup bursts (every ~100ms for DTIM=1)
+			// that stress the PSU capacitor via ripple current. MCU sleep would also break
+			// interrupt-driven and SPI-based power measurement. Disable all sleep modes.
+			ADDLOG_INFO(LOG_FEATURE_CMD, "PowerSave: interrupt-sensitive drivers active, disabling all sleep modes to protect hardware");
+			bk_wlan_power_save_set_level(0);
+			bOn = 0;
+		} else {
+			bk_wlan_power_save_set_level(PS_RF_SLEEP_BIT | PS_MCU_SLEEP_BIT);
+		}
 	}
 	else {
 		bk_wlan_power_save_set_level(0);
