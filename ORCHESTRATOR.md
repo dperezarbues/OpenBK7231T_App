@@ -73,6 +73,9 @@ name). The `sendGetAuth` OpenBK command appends `&token=<jwt>` automatically
 # optional token rotation (only when expiry < 7 days away)
 setDeviceToken eyJhbGci...
 
+# optional OTA update (only when fw param is outdated)
+ota_http http://firmware.home/bk7231n/openbk-1.2.4.rbl
+
 # device config commands follow
 MqttHost 192.168.1.10
 MqttPort 1883
@@ -80,7 +83,13 @@ MqttUser kitchen-switch
 MqttPassword s3cr3t
 DevName Kitchen Switch
 Topic kitchen/switch
+backlog channel 1 1; channel 2 0
 ```
+
+**Response line ordering matters.** The device executes lines top-to-bottom.
+`setDeviceToken` must come before `ota_http` so the new token is persisted
+to flash before the device reboots after OTA. `ota_http` triggers a reboot,
+so any commands after it will not execute.
 
 **Error responses:**
 
@@ -140,6 +149,59 @@ backlog channel 1 1; channel 2 0
 - `{{VAR}}` is replaced with the environment variable `VAR`.
 - Unknown placeholders cause a `500` response (no partial config).
 - Template comments (`# ...`) are stripped before sending.
+
+---
+
+## Firmware OTA Updates
+
+The device sends its current firmware version in the `fw` query parameter
+(expanded from `$Version` by the OpenBK tokenizer before the URL is sent).
+
+The orchestrator compares this against a target version per device (stored as
+an env var or in a versions file) and prepends `ota_http <url>` only when an
+upgrade is needed.
+
+**OTA command:**
+```
+ota_http http://firmware.home/bk7231n/openbk-1.2.4.rbl
+```
+
+`ota_http` downloads the firmware image over HTTP and reboots the device.
+The URL must serve a raw `.rbl` firmware binary directly (no redirects).
+
+**Versioning strategy:**
+
+| Approach | Description |
+|----------|-------------|
+| Per-device env var | `FW_TARGET_kitchen-switch=1.2.4` — fine-grained control |
+| Per-platform env var | `FW_TARGET_BK7231N=1.2.4` — uniform fleet upgrades |
+| versions file in GitHub repo | `devices/versions.json` — version pinning in git |
+
+**`devices/versions.json` example** (if using git-tracked versions):
+```json
+{
+  "default": "1.2.4",
+  "kitchen-switch": "1.2.3",
+  "office-plug": "1.2.4"
+}
+```
+
+**Orchestrator logic (Node.js sketch):**
+```javascript
+// after template render, before sending response
+const targetVersion = getTargetVersion(deviceName);  // from env or versions.json
+const currentVersion = new URL(req.url, "http://x").searchParams.get("fw") ?? "";
+
+if (targetVersion && currentVersion !== targetVersion) {
+  const fwUrl = `${process.env.FIRMWARE_BASE_URL}/${targetVersion}/openbk-${targetVersion}.rbl`;
+  lines.unshift(`ota_http ${fwUrl}`);
+}
+```
+
+**`FIRMWARE_BASE_URL`** env var example: `http://192.168.1.5:8090/firmware/bk7231n`
+
+The firmware files can be served from any plain HTTP server (nginx, Caddy,
+Python `http.server`) or from a GitHub release asset URL.
 
 ---
 
@@ -219,6 +281,9 @@ Subsequent rotations happen automatically via orchestrator responses.
 | `TOKEN_ROTATION_THRESHOLD_DAYS` | No | Days before expiry to rotate token (default: `7`) |
 | `STEP_CA_URL` | No | Step CA URL for token rotation (e.g. `https://ca.home:9000`) |
 | `STEP_PROVISIONER` | No | Provisioner name for rotation (default: `device-provisioner`) |
+| `FIRMWARE_BASE_URL` | No | Base URL for firmware binaries (e.g. `http://nas:8090/firmware/bk7231n`) |
+| `FW_TARGET_<DEVICE>` | No | Target firmware version for a specific device (overrides default) |
+| `FW_TARGET_DEFAULT` | No | Default target firmware version for all devices |
 
 ---
 
