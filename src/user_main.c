@@ -70,6 +70,8 @@ extern void WFI(void);
 int g_secondsElapsed = 0;
 // open access point after this number of seconds
 int g_openAP = 0;
+// trigger WiFi reconnect after this number of seconds
+int g_reconnectWiFi = 0;
 // connect to wifi after this number of seconds
 static int g_connectToWiFi = 0;
 // reset after this number of seconds
@@ -1006,6 +1008,18 @@ void Main_OnEverySecond()
 		{
 			HAL_SetupWiFiOpenAccessPoint(CFG_GetDeviceName());
 			g_bOpenAccessPointMode = 1;
+		}
+	}
+
+	if (g_reconnectWiFi)
+	{
+		g_reconnectWiFi--;
+		if (0 == g_reconnectWiFi)
+		{
+			ADDLOGF_INFO("WiFiReconnect: disconnecting and reconnecting to WiFi");
+			HAL_DisconnectFromWifi();
+			g_bHasWiFiConnected = 0;
+			g_connectToWiFi = 5;
 		}
 	}
 

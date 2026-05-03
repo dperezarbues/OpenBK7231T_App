@@ -1193,6 +1193,7 @@ extern int g_pinDeepSleepWakeUp;
 extern int g_timeSinceLastPingReply;
 extern int g_startPingWatchDogAfter;
 extern int g_openAP;
+extern int g_reconnectWiFi;
 extern int g_bootFailures;
 extern int g_secondsElapsed;
 extern int g_rebootReason;
