@@ -48,9 +48,16 @@ OpenBK commands.
 
 ## API
 
-### `GET /:device_name`
+### `GET /:device_name[?fw=<version>]`
 
 Provision a device.
+
+**Query parameters:**
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `token`   | Yes (if no Bearer header) | Device JWT; appended automatically by `sendGetAuth` |
+| `fw`      | No | Firmware version string (`$Version`); orchestrator can use this to decide whether to add an OTA command |
 
 **Request headers:**
 ```
@@ -58,8 +65,8 @@ Authorization: Bearer <device_jwt>
 ```
 
 The JWT is issued by Step CA for this specific device (subject = device short
-name). The `sendGetAuth` OpenBK command appends `?token=<jwt>` automatically
-when no `Authorization` header is available.
+name). The `sendGetAuth` OpenBK command appends `&token=<jwt>` automatically
+(using `&` since `?fw=...` already starts the query string).
 
 **Successful response** `200 text/plain`:
 ```
@@ -333,10 +340,59 @@ function send(res, code, body, type = "text/plain") {
 ## Device autoexec.bat Example
 
 ```
-# Call orchestrator on boot — device authenticates with its JWT
-# sendGetAuth appends ?token=<device_jwt> automatically
-sendGetAuth http://orchestrator.home/$ShortName cmd
+# Call orchestrator on boot — device authenticates with its JWT.
+# sendGetAuth appends &token=<device_jwt> automatically (uses & because
+# ?fw=$Version already starts the query string).
+sendGetAuth http://orchestrator.home/$ShortName?fw=$Version cmd
 ```
+
+The orchestrator can read `fw` to decide whether to include an OTA update
+command in the response, and the token is appended as `&token=<jwt>` since
+`?` is already present in the URL.
+
+---
+
+## Initial Device Provisioning
+
+Do this once per device, before autoexec.bat relies on `sendGetAuth`.
+
+**Step 1 — Store the CA public key on the device**
+
+Export the CA public key from Smallstep:
+```bash
+step ca root | step crypto key inspect --public | step crypto key format --pem > ca_pubkey.pem
+```
+
+Upload via the OpenBK web UI (LittleFS → Upload → `ca_pubkey`), or run
+the scripting command (paste the PEM content as a single escaped string):
+```
+setCAKey "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZI...\n-----END PUBLIC KEY-----\n"
+```
+
+**Step 2 — Issue and store the first device token**
+
+```bash
+# 30-day token for "kitchen-switch"
+step ca token \
+  --provisioner device-provisioner \
+  --expire 720h \
+  kitchen-switch
+```
+
+Paste the output JWT into the device console or MQTT:
+```
+setDeviceToken eyJhbGci...
+```
+
+From this point on, the orchestrator will rotate the token automatically
+whenever it has less than 7 days remaining.
+
+**Step 3 — Verify**
+
+```
+getDeviceToken
+```
+Logs should show: `getDeviceToken: token valid, expires in ~30 days`
 
 The orchestrator responds with commands that are saved to `cmd` and executed.
 The device is fully configured within 1-2 seconds of boot without storing any

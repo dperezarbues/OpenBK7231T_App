@@ -11,6 +11,45 @@
 #endif
 
 /*
+ * setCAKey <pem>
+ *   Stores the Step CA public key (EC P-256, PEM format) used to verify
+ *   inbound JWTs for web UI access and orchestrator-signed tokens.
+ *
+ *   Initial provisioning: paste the PEM from `step ca root` output.
+ *   After that, the CA key rarely changes (only if you rotate the CA itself).
+ *
+ *   The key is persisted to LittleFS as "ca_pubkey" and loaded at boot.
+ *   Multi-line PEM must be passed as a quoted string with \n escapes.
+ *
+ *   Example:
+ *     setCAKey "-----BEGIN PUBLIC KEY-----\nMFkw...\n-----END PUBLIC KEY-----\n"
+ */
+static commandResult_t CMD_SetCAKey(const void *context, const char *cmd,
+                                     const char *args, int cmdFlags)
+{
+#if MQTT_USE_TLS
+    Tokenizer_TokenizeString(args, TOKENIZER_ALLOW_QUOTES | TOKENIZER_ALLOW_ESCAPING_QUOTATIONS);
+    if (Tokenizer_CheckArgsCountAndPrintWarning(cmd, 1))
+        return CMD_RES_NOT_ENOUGH_ARGUMENTS;
+
+    const char *pem = Tokenizer_GetArg(0);
+    if (!pem || !*pem) {
+        ADDLOG_ERROR(LOG_FEATURE_CMD, "setCAKey: empty PEM");
+        return CMD_RES_NOT_ENOUGH_ARGUMENTS;
+    }
+
+    if (!JWT_SetCAKey(pem)) {
+        ADDLOG_ERROR(LOG_FEATURE_CMD, "setCAKey: failed to store CA key");
+        return CMD_RES_ERROR;
+    }
+    return CMD_RES_OK;
+#else
+    ADDLOG_ERROR(LOG_FEATURE_CMD, "setCAKey: requires MQTT_USE_TLS build");
+    return CMD_RES_ERROR;
+#endif
+}
+
+/*
  * setDeviceToken <jwt>
  *   Stores the Step CA issued JWT for this device.
  *   Used by sendGetAuth to authenticate outgoing requests to the orchestrator.
@@ -121,6 +160,12 @@ static commandResult_t CMD_SendGetAuth(const void *context, const char *cmd,
 
 int CMD_InitAuthCommands(void)
 {
+    //cmddetail:{"name":"setCAKey","args":"[PEM]",
+    //cmddetail:"descr":"Stores the Step CA public key (EC P-256 PEM) used to verify inbound JWTs for web UI access. Persisted to LittleFS as 'ca_pubkey'. Get it with: step ca root | step crypto key inspect --public | step crypto key format --pem",
+    //cmddetail:"fn":"CMD_SetCAKey","file":"cmnds/cmd_auth.c","requires":"MQTT_USE_TLS",
+    //cmddetail:"examples":"setCAKey \"-----BEGIN PUBLIC KEY-----\\nMFkw...\\n-----END PUBLIC KEY-----\\n\""}
+    CMD_RegisterCommand("setCAKey", CMD_SetCAKey, NULL);
+
     //cmddetail:{"name":"setDeviceToken","args":"[JWT]",
     //cmddetail:"descr":"Stores a Step CA issued JWT as the device identity token. Used by sendGetAuth to authenticate requests to the orchestrator. The orchestrator returns a fresh token before expiry for automatic rotation.",
     //cmddetail:"fn":"CMD_SetDeviceToken","file":"cmnds/cmd_auth.c","requires":"MQTT_USE_TLS",
