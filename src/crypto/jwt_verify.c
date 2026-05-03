@@ -126,6 +126,23 @@ int JWT_VerifyES256(const char *jwt_str)
     const char *dot2 = strchr(dot1 + 1, '.');
     if (!dot2) return 0;
 
+    /* verify header declares alg=ES256 — reject "none" and other algorithms */
+    {
+        int hdr_len = 0;
+        unsigned char *hdr = b64url_decode(jwt_str, (int)(dot1 - jwt_str), &hdr_len);
+        if (!hdr) return 0;
+        cJSON *hdr_json = cJSON_Parse((char *)hdr);
+        free(hdr);
+        if (!hdr_json) return 0;
+        cJSON *alg = cJSON_GetObjectItem(hdr_json, "alg");
+        int alg_ok = alg && cJSON_IsString(alg) && strcmp(alg->valuestring, "ES256") == 0;
+        cJSON_Delete(hdr_json);
+        if (!alg_ok) {
+            ADDLOG_ERROR(LOG_FEATURE_CMD, "JWT: alg is not ES256");
+            return 0;
+        }
+    }
+
     /* message = everything before the second dot */
     int msg_len = (int)(dot2 - jwt_str);
 

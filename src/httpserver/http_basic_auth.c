@@ -27,60 +27,72 @@
 #if MQTT_USE_TLS
 static int jwt_auth_eval(http_request_t *request)
 {
-    /* check session cookie first to avoid repeated ECDSA verify */
-    for (int i = 0; i < request->numheaders; i++) {
-        const char *h = request->headers[i];
-        if (!my_strnicmp(h, "Cookie: ", 8)) {
-            /* look for session=<id> inside the cookie string */
-            const char *p = strstr(h + 8, "session=");
-            if (p) {
-                p += 8;
-                char sid[33];
-                int j = 0;
-                while (p[j] && p[j] != ';' && p[j] != ' ' && j < 32)
-                    sid[j] = p[j++];
-                sid[j] = '\0';
-                if (JWT_ValidateSession(sid))
-                    return HTTP_BASIC_AUTH_OK;
-            }
-        }
-    }
+	/* check session cookie first to avoid repeated ECDSA verify
+	 * NOTE: Set-Cookie is not currently sent in responses because the HTTP
+	 * architecture writes the status line before auth runs. The session table
+	 * is populated but the cookie only helps clients that echo it manually.
+	 * TODO: inject Set-Cookie header once the HTTP layer supports it. */
+	for (int i = 0; i < request->numheaders; i++) {
+		const char *h = request->headers[i];
+		if (!my_strnicmp(h, "Cookie: ", 8)) {
+			const char *p = h + 8;
+			/* walk cookie pairs; standard separator is "; " */
+			while (p && *p) {
+				/* skip leading spaces after "; " */
+				while (*p == ' ') p++;
+				/* require exact name match: "session=" at word boundary */
+				if (!strncmp(p, "session=", 8)) {
+					p += 8;
+					char sid[33];
+					int j = 0;
+					while (p[j] && p[j] != ';' && j < 32)
+						sid[j] = p[j++];
+					sid[j] = '\0';
+					if (JWT_ValidateSession(sid))
+						return HTTP_BASIC_AUTH_OK;
+					break;
+				}
+				/* advance past this cookie pair */
+				p = strchr(p, ';');
+				if (p) p++;
+			}
+		}
+	}
 
-    const char *jwt_str = NULL;
-    char bearer_buf[JWT_MAX_TOKEN_LEN];
+	const char *jwt_str = NULL;
+	char bearer_buf[JWT_MAX_TOKEN_LEN];
 
-    /* 1. Authorization: Bearer <jwt> */
-    for (int i = 0; i < request->numheaders; i++) {
-        const char *h = request->headers[i];
-        if (!my_strnicmp(h, "Authorization: Bearer ", 22)) {
-            strncpy(bearer_buf, h + 22, sizeof(bearer_buf) - 1);
-            bearer_buf[sizeof(bearer_buf) - 1] = '\0';
-            jwt_str = bearer_buf;
-            break;
-        }
-    }
+	/* 1. Authorization: Bearer <jwt> */
+	for (int i = 0; i < request->numheaders; i++) {
+		const char *h = request->headers[i];
+		if (!my_strnicmp(h, "Authorization: Bearer ", 22)) {
+			strncpy(bearer_buf, h + 22, sizeof(bearer_buf) - 1);
+			bearer_buf[sizeof(bearer_buf) - 1] = '\0';
+			jwt_str = bearer_buf;
+			break;
+		}
+	}
 
-    /* 2. ?token=<jwt> query parameter */
-    if (!jwt_str) {
-        for (int i = 0; i < request->numqueryitems; i++) {
-            if (strcmp(request->querynames[i], "token") == 0) {
-                jwt_str = request->queryvalues[i];
-                break;
-            }
-        }
-    }
+	/* 2. ?token=<jwt> query parameter */
+	if (!jwt_str) {
+		for (int i = 0; i < request->numqueryitems; i++) {
+			if (strcmp(request->querynames[i], "token") == 0) {
+				jwt_str = request->queryvalues[i];
+				break;
+			}
+		}
+	}
 
-    if (!jwt_str || !*jwt_str)
-        return HTTP_BASIC_AUTH_FAIL;
+	if (!jwt_str || !*jwt_str)
+		return HTTP_BASIC_AUTH_FAIL;
 
-    if (!JWT_VerifyES256(jwt_str)) {
-        ADDLOGF_INFO("AUTH: JWT verification failed");
-        return HTTP_BASIC_AUTH_FAIL;
-    }
+	if (!JWT_VerifyES256(jwt_str)) {
+		ADDLOGF_INFO("AUTH: JWT verification failed");
+		return HTTP_BASIC_AUTH_FAIL;
+	}
 
-    /* valid JWT — create a session so future requests skip ECDSA */
-    JWT_CreateSession();
-    return HTTP_BASIC_AUTH_OK;
+	JWT_CreateSession();
+	return HTTP_BASIC_AUTH_OK;
 }
 #endif /* MQTT_USE_TLS */
 
