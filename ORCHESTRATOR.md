@@ -518,7 +518,28 @@ setDeviceToken eyJhbGci...
 From this point on, the orchestrator will rotate the token automatically
 whenever it has less than 7 days remaining.
 
-**Step 3 — Verify**
+**Step 3 — Block OTA via MQTT**
+
+MQTT credentials protect the broker, but as an extra layer you can disable
+OTA updates from being triggered via MQTT entirely:
+
+```
+SetFlag 52 1
+```
+
+This sets `OBK_FLAG_MQTT_BLOCK_OTA`. Any `ota_http` command arriving via MQTT
+will be rejected with an error log and no download attempted. OTA via the web
+UI and via the orchestrator (HTTP) continues to work normally.
+
+Add this to your device config template so it is applied on every boot:
+```
+# devices/kitchen-switch.txt
+SetFlag 52 1
+MqttHost {{MQTT_HOST}}
+...
+```
+
+**Step 4 — Verify**
 
 ```
 getDeviceToken
@@ -542,5 +563,9 @@ MQTT credentials on the device itself.
 - **Restrict orchestrator network access**: bind to the management VLAN only;
   IoT devices and the orchestrator should be on the same isolated network
   segment, not exposed to the internet.
+- **Block OTA via MQTT**: even with valid MQTT credentials an attacker could
+  trigger `ota_http`. Set `OBK_FLAG_MQTT_BLOCK_OTA` (`SetFlag 52 1`) on every
+  device to prevent this. Include it in the config template so it is enforced
+  on every boot.
 - **CA key backup**: the Step CA root private key must be backed up securely.
   Loss of the CA key requires re-provisioning all devices.

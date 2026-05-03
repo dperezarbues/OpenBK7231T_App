@@ -494,6 +494,13 @@ static commandResult_t CMD_Flags(const void* context, const char* cmd, const cha
 }
 static commandResult_t CMD_HTTPOTA(const void* context, const char* cmd, const char* args, int cmdFlags) {
 
+	if (cmdFlags & COMMAND_FLAG_SOURCE_MQTT) {
+		if (CFG_HasFlag(OBK_FLAG_MQTT_BLOCK_OTA)) {
+			ADDLOG_ERROR(LOG_FEATURE_CMD, "ota_http: blocked from MQTT (OBK_FLAG_MQTT_BLOCK_OTA set)");
+			return CMD_RES_ERROR;
+		}
+	}
+
 	if (args && *args) {
 		OTA_RequestDownloadFromHTTP(args);
 	}
