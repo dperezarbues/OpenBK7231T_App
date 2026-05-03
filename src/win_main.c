@@ -281,6 +281,7 @@ void Win_DoUnitTests()
 	Test_MultiplePinsOnChannel();
 	Test_Flags();
 	Test_Auth();
+	Test_OrchestratorCmds();
 #ifndef LINUX
 	// TODO: fix on Linux
 	Test_DHT();

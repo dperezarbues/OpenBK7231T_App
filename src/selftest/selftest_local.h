@@ -111,6 +111,7 @@ void Test_EnergyMeter();
 void Test_DHT();
 void Test_Flags();
 void Test_Auth();
+void Test_OrchestratorCmds();
 void Test_MultiplePinsOnChannel();
 void Test_HassDiscovery();
 void Test_HassDiscovery_Base();
