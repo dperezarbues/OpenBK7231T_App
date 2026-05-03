@@ -825,6 +825,7 @@
     <ClCompile Include="src\selftest\selftest_DHT.c" />
     <ClCompile Include="src\selftest\selftest_energyMeter.c" />
     <ClCompile Include="src\selftest\selftest_expandConstant.c" />
+    <ClCompile Include="src\selftest\selftest_auth.c" />
     <ClCompile Include="src\selftest\selftest_expressions.c" />
     <ClCompile Include="src\selftest\selftest_flags.c" />
     <ClCompile Include="src\selftest\selftest_hass_discovery.c" />
