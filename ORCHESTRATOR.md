@@ -32,17 +32,20 @@ OpenBK commands.
 
 1. Device boots, runs `autoexec.bat`:
    ```
-   sendGetAuth http://orchestrator.home/$ShortName cmd
+   sendGetAuth http://orchestrator.home/$ShortName?fw=$Version cmd
    ```
 2. Orchestrator receives request, extracts JWT from `Authorization: Bearer`
-   header (or `?token=` query param if set by `sendGetAuth`).
+   header (or `?token=` query param appended by `sendGetAuth`).
 3. Orchestrator verifies JWT ES256 signature against the Step CA public key.
 4. Orchestrator fetches `$ShortName.txt` from the private GitHub config repo.
 5. Orchestrator substitutes `{{VAR}}` placeholders with secrets from env.
 6. If the device token expires within 7 days, orchestrator prepends a fresh
    `setDeviceToken <new_jwt>` line to auto-rotate the token.
-7. Orchestrator returns the rendered config as `text/plain`.
-8. Device executes each line as an OpenBK command via the `cmd` target file.
+7. If the `fw` version is outdated, orchestrator prepends
+   `ota_http http://orchestrator.home/$ShortName/firmware?token=<jwt>`
+   embedding the device's own JWT so the binary endpoint can verify it.
+8. Orchestrator returns the rendered config as `text/plain`.
+9. Device executes lines top-to-bottom: token rotation → OTA (reboots) → config.
 
 ---
 
@@ -70,13 +73,14 @@ name). The `sendGetAuth` OpenBK command appends `&token=<jwt>` automatically
 
 **Successful response** `200 text/plain`:
 ```
-# optional token rotation (only when expiry < 7 days away)
+# 1. optional token rotation (only when expiry < 7 days away)
 setDeviceToken eyJhbGci...
 
-# optional OTA update (only when fw param is outdated)
-ota_http http://firmware.home/bk7231n/openbk-1.2.4.rbl
+# 2. optional OTA (only when fw param is outdated)
+#    token is embedded by the orchestrator — no new firmware command needed
+ota_http http://orchestrator.home/kitchen-switch/firmware?token=eyJhbGci...
 
-# device config commands follow
+# 3. device config (only reached if no OTA, since ota_http reboots)
 MqttHost 192.168.1.10
 MqttPort 1883
 MqttUser kitchen-switch
@@ -86,10 +90,10 @@ Topic kitchen/switch
 backlog channel 1 1; channel 2 0
 ```
 
-**Response line ordering matters.** The device executes lines top-to-bottom.
-`setDeviceToken` must come before `ota_http` so the new token is persisted
-to flash before the device reboots after OTA. `ota_http` triggers a reboot,
-so any commands after it will not execute.
+**Response line ordering matters.** The device executes lines top-to-bottom:
+1. `setDeviceToken` — persists new token to flash before any reboot
+2. `ota_http` — downloads binary and reboots; lines after this do not execute
+3. Config commands — only run on the current (up-to-date) firmware boot
 
 **Error responses:**
 
@@ -98,6 +102,37 @@ so any commands after it will not execute.
 | 401  | Missing or invalid JWT |
 | 404  | No config template for this device name |
 | 502  | GitHub fetch failed |
+
+---
+
+### `GET /:device_name/firmware?token=<jwt>`
+
+Serve the firmware binary for a device. The token is embedded in the URL by
+the orchestrator itself when it generates the `ota_http` line — the device
+never needs to construct this URL manually.
+
+**No new firmware command required.** The device uses the plain `ota_http`
+command with the full URL (including token) that the orchestrator provided.
+
+**Verification:** same JWT ES256 check as the config endpoint. The `sub` claim
+must match `:device_name`.
+
+**Successful response** `200 application/octet-stream`:
+Raw `.rbl` binary streamed directly. `Content-Length` must be set so the OTA
+client knows when the download is complete.
+
+**Error responses:**
+
+| Code | Reason |
+|------|--------|
+| 401  | Missing or invalid JWT, or `sub` mismatch |
+| 404  | No firmware configured for this device |
+| 503  | Upstream firmware source unavailable |
+
+**Where the orchestrator fetches the binary from** (in order of preference):
+1. Local filesystem (`./firmware/<platform>/<version>.rbl`) — fastest, works offline
+2. GitHub release asset — version-pinned, audit trail in git
+3. Official OpenBK GitHub releases — for unmodified firmware
 
 ---
 
@@ -154,54 +189,84 @@ backlog channel 1 1; channel 2 0
 
 ## Firmware OTA Updates
 
-The device sends its current firmware version in the `fw` query parameter
-(expanded from `$Version` by the OpenBK tokenizer before the URL is sent).
+The device reports its current version in `?fw=<version>` (the `$Version`
+variable expanded by the OpenBK tokenizer). The orchestrator compares this
+against the target version and, if outdated, prepends an `ota_http` line to
+the config response.
 
-The orchestrator compares this against a target version per device (stored as
-an env var or in a versions file) and prepends `ota_http <url>` only when an
-upgrade is needed.
+**Why the orchestrator serves the binary (not a separate file server):**
+- `ota_http` is a plain HTTP GET — it has no built-in header support, so it
+  cannot add an `Authorization: Bearer` header itself.
+- Solution: the orchestrator embeds the device's own JWT into the URL it
+  generates, so `ota_http` fetches an authenticated URL without any firmware
+  changes:
+  ```
+  ota_http http://orchestrator.home/kitchen-switch/firmware?token=eyJ...
+  ```
+  The orchestrator composes this URL using the JWT it just verified from the
+  incoming request — the device never constructs it.
 
-**OTA command:**
-```
-ota_http http://firmware.home/bk7231n/openbk-1.2.4.rbl
-```
-
-`ota_http` downloads the firmware image over HTTP and reboots the device.
-The URL must serve a raw `.rbl` firmware binary directly (no redirects).
-
-**Versioning strategy:**
+**Versioning strategy** — pick one:
 
 | Approach | Description |
 |----------|-------------|
-| Per-device env var | `FW_TARGET_kitchen-switch=1.2.4` — fine-grained control |
-| Per-platform env var | `FW_TARGET_BK7231N=1.2.4` — uniform fleet upgrades |
-| versions file in GitHub repo | `devices/versions.json` — version pinning in git |
+| `FW_TARGET_DEFAULT` env var | Single version for the whole fleet |
+| `FW_TARGET_<device>` env var | Per-device override |
+| `devices/versions.json` in GitHub repo | Version pinning in git, auditable |
 
-**`devices/versions.json` example** (if using git-tracked versions):
+**`devices/versions.json` example:**
 ```json
 {
-  "default": "1.2.4",
+  "_default": "1.2.4",
   "kitchen-switch": "1.2.3",
   "office-plug": "1.2.4"
 }
 ```
 
+**Firmware binary sources** (orchestrator fetches from one of):
+1. Local volume mount — `./firmware/bk7231n/<version>.rbl` — fastest, offline-capable
+2. GitHub release asset — version-pinned, public audit trail
+3. Official OpenBK GitHub releases — for stock firmware
+
 **Orchestrator logic (Node.js sketch):**
 ```javascript
-// after template render, before sending response
-const targetVersion = getTargetVersion(deviceName);  // from env or versions.json
-const currentVersion = new URL(req.url, "http://x").searchParams.get("fw") ?? "";
+// config endpoint — decide whether OTA is needed
+const currentFw = new URL(req.url, "http://x").searchParams.get("fw") ?? "";
+const targetFw  = getTargetVersion(deviceName);  // from env or versions.json
 
-if (targetVersion && currentVersion !== targetVersion) {
-  const fwUrl = `${process.env.FIRMWARE_BASE_URL}/${targetVersion}/openbk-${targetVersion}.rbl`;
+if (targetFw && currentFw !== targetFw) {
+  // embed the device's own JWT so the /firmware endpoint can verify it
+  const fwUrl = `http://orchestrator.home/${deviceName}/firmware?token=${rawJwt}`;
   lines.unshift(`ota_http ${fwUrl}`);
 }
+
+// ---
+
+// firmware endpoint  GET /:device_name/firmware?token=<jwt>
+app.get("/:name/firmware", async (req, res) => {
+  const { name } = req.params;
+  const token = req.query.token;
+  if (!token) return res.status(401).send("no token");
+
+  let payload;
+  try {
+    ({ payload } = await jwtVerify(token, CA_KEY, { algorithms: ["ES256"] }));
+  } catch (e) {
+    return res.status(401).send("invalid token");
+  }
+  if (payload.sub !== name) return res.status(401).send("subject mismatch");
+
+  const version = getTargetVersion(name);
+  if (!version) return res.status(404).send("no firmware configured");
+
+  const fwPath = path.join(process.env.FIRMWARE_DIR, `${version}.rbl`);
+  if (!fs.existsSync(fwPath)) return res.status(503).send("firmware file missing");
+
+  res.setHeader("Content-Type", "application/octet-stream");
+  res.setHeader("Content-Length", fs.statSync(fwPath).size);
+  fs.createReadStream(fwPath).pipe(res);
+});
 ```
-
-**`FIRMWARE_BASE_URL`** env var example: `http://192.168.1.5:8090/firmware/bk7231n`
-
-The firmware files can be served from any plain HTTP server (nginx, Caddy,
-Python `http.server`) or from a GitHub release asset URL.
 
 ---
 
@@ -281,9 +346,10 @@ Subsequent rotations happen automatically via orchestrator responses.
 | `TOKEN_ROTATION_THRESHOLD_DAYS` | No | Days before expiry to rotate token (default: `7`) |
 | `STEP_CA_URL` | No | Step CA URL for token rotation (e.g. `https://ca.home:9000`) |
 | `STEP_PROVISIONER` | No | Provisioner name for rotation (default: `device-provisioner`) |
-| `FIRMWARE_BASE_URL` | No | Base URL for firmware binaries (e.g. `http://nas:8090/firmware/bk7231n`) |
-| `FW_TARGET_<DEVICE>` | No | Target firmware version for a specific device (overrides default) |
+| `FIRMWARE_DIR` | No | Local path to `.rbl` firmware binaries (e.g. `/firmware/bk7231n`) |
+| `ORCHESTRATOR_BASE_URL` | Yes (if OTA used) | Public URL of the orchestrator itself (e.g. `http://orchestrator.home`), used to build `ota_http` URLs |
 | `FW_TARGET_DEFAULT` | No | Default target firmware version for all devices |
+| `FW_TARGET_<DEVICE>` | No | Per-device firmware version override (e.g. `FW_TARGET_kitchen-switch=1.2.3`) |
 
 ---
 
