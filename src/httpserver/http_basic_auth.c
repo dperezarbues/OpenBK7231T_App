@@ -91,7 +91,9 @@ static int jwt_auth_eval(http_request_t *request)
 		return HTTP_BASIC_AUTH_FAIL;
 	}
 
-	JWT_CreateSession();
+	/* register jti in session table so subsequent Cookie: session=<jti>
+	 * requests skip ECDSA — client derives jti from its own JWT payload */
+	JWT_RegisterVerifiedToken(jwt_str);
 	return HTTP_BASIC_AUTH_OK;
 }
 #endif /* MQTT_USE_TLS */

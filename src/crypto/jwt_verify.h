@@ -26,8 +26,9 @@
 /* Maximum sizes */
 #define JWT_MAX_PUBKEY_PEM   1024
 #define JWT_MAX_TOKEN_LEN    1024
+#define JWT_JTI_MAX          40    /* Step CA jti is a UUID (36 chars) + NUL */
 #define JWT_SESSION_MAX      4     /* max simultaneous browser sessions */
-#define JWT_SESSION_TTL      86400 /* session cookie lifetime in seconds */
+#define JWT_SESSION_TTL      86400 /* fallback TTL when JWT carries no exp */
 
 /*
  * Load CA public key and device token from LittleFS into RAM.
@@ -68,8 +69,21 @@ int JWT_SetDeviceToken(const char *token);
  */
 const char *JWT_GetDeviceToken(void);
 
-/* Session cookie helpers */
-const char *JWT_CreateSession(void);
+/*
+ * Extract the jti claim from a JWT without signature verification.
+ * The JWT payload is base64url-encoded JSON (not encrypted), so jti can be
+ * read by the client from its own token to derive its session cookie value.
+ */
+char *JWT_GetJTI(const char *jwt_str, char *buf, int buflen);
+
+/*
+ * Register the jti+exp of a successfully verified JWT in the session table.
+ * The client can then send Cookie: session=<jti> to skip ECDSA on subsequent
+ * requests — it derives the jti by base64url-decoding its own JWT payload.
+ */
+void JWT_RegisterVerifiedToken(const char *jwt_str);
+
+/* Check and maintain the session table */
 int JWT_ValidateSession(const char *session_id);
 void JWT_PurgeExpiredSessions(void);
 

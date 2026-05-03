@@ -21,8 +21,8 @@ static char g_ca_pubkey_pem[JWT_MAX_PUBKEY_PEM];
 static char g_device_token[JWT_MAX_TOKEN_LEN];
 
 typedef struct {
-    char id[33];           /* 32 hex chars + NUL */
-    unsigned int expires;  /* Unix timestamp */
+    char id[JWT_JTI_MAX];  /* jti claim from Step CA JWT (UUID = 36 chars) */
+    unsigned int expires;  /* Unix timestamp — copied from JWT exp claim */
 } jwt_session_t;
 
 static jwt_session_t g_sessions[JWT_SESSION_MAX];
@@ -274,33 +274,53 @@ const char *JWT_GetDeviceToken(void)
 
 /* ── session cookies ──────────────────────────────────────────────── */
 
-const char *JWT_CreateSession(void)
+/*
+ * Extract the jti claim from a JWT payload without signature verification.
+ * Safe to call without verifying — payload is base64url JSON, not secret.
+ * Returns buf on success or NULL if jti is absent.
+ */
+char *JWT_GetJTI(const char *jwt_str, char *buf, int buflen)
 {
+    cJSON *json = jwt_decode_payload(jwt_str);
+    if (!json) return NULL;
+    cJSON *jti = cJSON_GetObjectItem(json, "jti");
+    if (!jti || !cJSON_IsString(jti)) {
+        cJSON_Delete(json);
+        return NULL;
+    }
+    strncpy(buf, jti->valuestring, buflen - 1);
+    buf[buflen - 1] = '\0';
+    cJSON_Delete(json);
+    return buf;
+}
+
+/*
+ * Register a successfully verified JWT's jti+exp in the session table.
+ * The client can later present Cookie: session=<jti> to skip ECDSA.
+ * The client derives the jti by base64url-decoding its own JWT payload —
+ * no crypto required on the client side.
+ */
+void JWT_RegisterVerifiedToken(const char *jwt_str)
+{
+    char jti[JWT_JTI_MAX];
+    if (!JWT_GetJTI(jwt_str, jti, sizeof(jti)))
+        return;
+
     JWT_PurgeExpiredSessions();
 
-    /* find an empty slot */
+    /* reuse existing slot for the same jti, otherwise find empty, else evict */
     int slot = -1;
     for (int i = 0; i < JWT_SESSION_MAX; i++) {
-        if (!g_sessions[i].id[0]) { slot = i; break; }
+        if (strcmp(g_sessions[i].id, jti) == 0) { slot = i; break; }
+        if (!g_sessions[i].id[0] && slot == -1)  slot = i;
     }
-    if (slot == -1) slot = 0;   /* evict oldest */
+    if (slot == -1) slot = 0;
 
-    /* generate session ID: SHA-256(mac + time + slot) → first 16 bytes as hex */
-    unsigned char seed[16];
-    unsigned int now = NTP_GetCurrentTime();
-    memcpy(seed, &now, 4);
-    memcpy(seed + 4, &slot, 4);
-    memcpy(seed + 8, g_device_token, 8);   /* mix in some device entropy */
-
-    unsigned char hash[32];
-    mbedtls_sha256_ret(seed, sizeof(seed), hash, 0);
-
-    for (int i = 0; i < 16; i++)
-        snprintf(g_sessions[slot].id + i * 2, 3, "%02x", hash[i]);
-    g_sessions[slot].id[32] = '\0';
-    g_sessions[slot].expires = now + JWT_SESSION_TTL;
-
-    return g_sessions[slot].id;
+    strncpy(g_sessions[slot].id, jti, JWT_JTI_MAX - 1);
+    g_sessions[slot].id[JWT_JTI_MAX - 1] = '\0';
+    /* expire session when the JWT itself expires */
+    unsigned int exp = JWT_GetExpiry(jwt_str);
+    g_sessions[slot].expires = exp ? exp : (NTP_GetCurrentTime() + JWT_SESSION_TTL);
 }
 
 int JWT_ValidateSession(const char *session_id)
