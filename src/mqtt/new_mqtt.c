@@ -1854,6 +1854,12 @@ commandResult_t MQTT_StartMQTTTestThread(const void* context, const char* cmd, c
 	return CMD_RES_OK;
 }
 
+static commandResult_t MQTT_CMDReconnect(const void* context, const char* cmd, const char* args, int cmdFlags) {
+	addLogAdv(LOG_INFO, LOG_FEATURE_MQTT, "MQTTReconnect: forcing reconnect");
+	mqtt_reconnect = 5;
+	return CMD_RES_OK;
+}
+
 /****************************************************************************************************
  *
  ****************************************************************************************************/
@@ -2006,6 +2012,11 @@ void MQTT_init()
 	//cmddetail:"fn":"MQTT_PublishCommandDriver","file":"mqtt/new_mqtt.c","requires":"",
 	//cmddetail:"examples":""}
 	CMD_RegisterCommand("publishDriver", MQTT_PublishCommandDriver, NULL);
+	//cmddetail:{"name":"MQTTReconnect","args":"",
+	//cmddetail:"descr":"Forces an immediate MQTT reconnect. Useful to recover after credentials change or network blip.",
+	//cmddetail:"fn":"MQTT_CMDReconnect","file":"mqtt/new_mqtt.c","requires":"",
+	//cmddetail:"examples":"MQTTReconnect"}
+	CMD_RegisterCommand("MQTTReconnect", MQTT_CMDReconnect, NULL);
 }
 static float getInternalTemperature() {
 	return g_wifi_temperature;

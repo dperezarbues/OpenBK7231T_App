@@ -670,6 +670,12 @@ static commandResult_t CMD_OpenAP(const void* context, const char* cmd, const ch
 
 	return CMD_RES_OK;
 }
+static commandResult_t CMD_WiFiReconnect(const void* context, const char* cmd, const char* args, int cmdFlags) {
+
+	g_reconnectWiFi = 3;
+
+	return CMD_RES_OK;
+}
 static commandResult_t CMD_SafeMode(const void* context, const char* cmd, const char* args, int cmdFlags) {
 	int i;
 	int startSaveModeIn;
@@ -1109,6 +1115,11 @@ void CMD_Init_Early() {
 	//cmddetail:"fn":"CMD_OpenAP","file":"cmnds/cmd_main.c","requires":"",
 	//cmddetail:"examples":""}
 	CMD_RegisterCommand("OpenAP", CMD_OpenAP, NULL);
+	//cmddetail:{"name":"WiFiReconnect","args":"",
+	//cmddetail:"descr":"Disconnects from the current WiFi network and reconnects using the stored credentials.",
+	//cmddetail:"fn":"CMD_WiFiReconnect","file":"cmnds/cmd_main.c","requires":"",
+	//cmddetail:"examples":"WiFiReconnect"}
+	CMD_RegisterCommand("WiFiReconnect", CMD_WiFiReconnect, NULL);
 	//cmddetail:{"name":"DSEdge","args":"[edgeCode][optionalPinIndex]",
 	//cmddetail:"descr":"DeepSleep (PinDeepSleep) wake configuration command. 0 means always wake up on rising edge, 1 means on falling, 2 means if state is high, use falling edge, if low, use rising. Default is 2. Second argument is optional and allows to set per-pin DSEdge instead of setting it for all pins.",
 	//cmddetail:"fn":"CMD_DeepSleep_SetEdge","file":"cmnds/cmd_main.c","requires":"",

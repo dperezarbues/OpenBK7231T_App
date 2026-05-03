@@ -120,6 +120,9 @@ const char *Tokenizer_GetArgExpanding(int i) {
 			else if (!strcmp(tconst, "${Name}") || !strcmp(tconst, "$Name")) {
 				strcat_safe(Templine, CFG_GetDeviceName(), sizeof(Templine));
 			}
+			else if (!strcmp(tconst, "${Version}") || !strcmp(tconst, "$Version")) {
+				strcat_safe(Templine, USER_SW_VER, sizeof(Templine));
+			}
 			else {
 				float f;
 				int iValue;
@@ -181,6 +184,9 @@ const char *Tokenizer_GetArg(int i) {
 		}
 		else if (!strcmp(s + 1, "Name")) {
 			strcpy_safe(g_argsExpanded[i], CFG_GetDeviceName(), sizeof(g_argsExpanded[i]));
+		}
+		else if (!strcmp(s + 1, "Version")) {
+			strcpy_safe(g_argsExpanded[i], USER_SW_VER, sizeof(g_argsExpanded[i]));
 		}
 		else {
 			float f;

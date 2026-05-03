@@ -455,6 +455,35 @@ static commandResult_t cmnd_MqttPassword(const void * context, const char *cmd, 
 	CFG_SetMQTTPass(Tokenizer_GetArg(0));
 	return CMD_RES_OK;
 }
+static commandResult_t cmnd_MqttPort(const void * context, const char *cmd, const char *args, int cmdFlags) {
+	int port;
+	Tokenizer_TokenizeString(args, 0);
+	if (Tokenizer_CheckArgsCountAndPrintWarning(cmd, 1)) {
+		return CMD_RES_NOT_ENOUGH_ARGUMENTS;
+	}
+	port = Tokenizer_GetArgInteger(0);
+	if (port <= 0 || port > 65535) {
+		return CMD_RES_BAD_ARGUMENT;
+	}
+	CFG_SetMQTTPort(port);
+	return CMD_RES_OK;
+}
+static commandResult_t cmnd_SSID2(const void * context, const char *cmd, const char *args, int cmdFlags) {
+	Tokenizer_TokenizeString(args, TOKENIZER_ALLOW_QUOTES);
+	if (Tokenizer_CheckArgsCountAndPrintWarning(cmd, 1)) {
+		return CMD_RES_NOT_ENOUGH_ARGUMENTS;
+	}
+	CFG_SetWiFiSSID2(Tokenizer_GetArg(0));
+	return CMD_RES_OK;
+}
+static commandResult_t cmnd_Password2(const void * context, const char *cmd, const char *args, int cmdFlags) {
+	Tokenizer_TokenizeString(args, TOKENIZER_ALLOW_QUOTES);
+	if (Tokenizer_CheckArgsCountAndPrintWarning(cmd, 1)) {
+		return CMD_RES_NOT_ENOUGH_ARGUMENTS;
+	}
+	CFG_SetWiFiPass2(Tokenizer_GetArg(0));
+	return CMD_RES_OK;
+}
 int taslike_commands_init(){
 	//cmddetail:{"name":"power","args":"[OnorOfforToggle]",
 	//cmddetail:"descr":"Tasmota-style POWER command. Should work for both LEDs and relay-based devices. You can write POWER0, POWER1, etc to access specific relays.",
@@ -511,6 +540,21 @@ int taslike_commands_init(){
 	//cmddetail:"fn":"cmnd_MqttGroup","file":"cmnds/cmd_tasmota.c","requires":"",
 	//cmddetail:"examples":""}
 	CMD_RegisterCommand("MqttGroup", cmnd_MqttGroup, NULL);
+	//cmddetail:{"name":"MqttPort","args":"[PortNumber]",
+	//cmddetail:"descr":"Sets the MQTT broker port number (1-65535). Command keeps Tasmota syntax",
+	//cmddetail:"fn":"cmnd_MqttPort","file":"cmnds/cmd_tasmota.c","requires":"",
+	//cmddetail:"examples":"MqttPort 1883"}
+	CMD_RegisterCommand("MqttPort", cmnd_MqttPort, NULL);
+	//cmddetail:{"name":"SSID2","args":"[ValueString]",
+	//cmddetail:"descr":"Sets the fallback WiFi SSID (requires ALLOW_SSID2 build flag to take effect at runtime)",
+	//cmddetail:"fn":"cmnd_SSID2","file":"cmnds/cmd_tasmota.c","requires":"",
+	//cmddetail:"examples":"SSID2 MyBackupNetwork"}
+	CMD_RegisterCommand("SSID2", cmnd_SSID2, NULL);
+	//cmddetail:{"name":"Password2","args":"[ValueString]",
+	//cmddetail:"descr":"Sets the fallback WiFi password (requires ALLOW_SSID2 build flag to take effect at runtime)",
+	//cmddetail:"fn":"cmnd_Password2","file":"cmnds/cmd_tasmota.c","requires":"",
+	//cmddetail:"examples":"Password2 mysecretpass"}
+	CMD_RegisterCommand("Password2", cmnd_Password2, NULL);
 
 	// those are stubs, they are handled elsewhere so we can have Tasmota style replies
 
