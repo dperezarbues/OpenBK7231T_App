@@ -37,6 +37,10 @@
 #include "littlefs/our_lfs.h"
 #endif
 
+#if MQTT_USE_TLS
+#include "crypto/jwt_verify.h"
+#endif
+
 
 #include "driver/drv_ntp.h"
 #include "driver/drv_mdns.h"
@@ -1361,6 +1365,9 @@ void Main_Init_BeforeDelay_Unsafe(bool bAutoRunScripts) {
 	// and we may add a command to empty fs just be writing first sector?
 	init_lfs(0);
 #endif
+#if MQTT_USE_TLS
+	JWT_Init();
+#endif
 
 	PIN_SetGenericDoubleClickCallback(app_on_generic_dbl_click);
 	ADDLOGF_DEBUG("Initialised other callbacks");
@@ -1379,6 +1386,7 @@ void Main_Init_BeforeDelay_Unsafe(bool bAutoRunScripts) {
 #if ENABLE_SEND_POSTANDGET
 	CMD_InitSendCommands();
 #endif
+	CMD_InitAuthCommands();
 	CMD_InitChannelCommands();
 	EventHandlers_Init();
 

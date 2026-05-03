@@ -127,7 +127,7 @@
 // Exchange Key //
 #define MBEDTLS_DHM_C
 #define MBEDTLS_ECDH_C
-#undef  MBEDTLS_ECDSA_C
+#define MBEDTLS_ECDSA_C  // needed for JWT ES256 signature verification
 #undef  MBEDTLS_ECJPAKE_C
 #undef  MBEDTLS_KEY_EXCHANGE_PSK_ENABLED
 #undef  MBEDTLS_KEY_EXCHANGE_DHE_PSK_ENABLED

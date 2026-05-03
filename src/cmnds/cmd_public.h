@@ -315,6 +315,8 @@ int CMD_InitTestCommands();
 void CMD_InitChannelCommands();
 // cmd_send.c
 int CMD_InitSendCommands();
+// cmd_auth.c
+int CMD_InitAuthCommands();
 // cmd_tcp.c
 void CMD_StartTCPCommandLine();
 // cmd_script.c

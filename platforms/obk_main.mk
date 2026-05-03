@@ -16,6 +16,7 @@ OBKM_SRC_CXX =
 OBKM_SRC  += $(OBK_SRCS)user_main.c
 
 OBKM_SRC  += $(OBK_SRCS)base64/base64.c
+OBKM_SRC  += $(OBK_SRCS)crypto/jwt_verify.c
 OBKM_SRC  += $(OBK_SRCS)bitmessage/bitmessage_read.c
 OBKM_SRC  += $(OBK_SRCS)bitmessage/bitmessage_write.c
 OBKM_SRC  += $(OBK_SRCS)cJSON/cJSON.c
@@ -31,6 +32,7 @@ OBKM_SRC  += $(OBK_SRCS)cmnds/cmd_repeatingEvents.c
 OBKM_SRC  += $(OBK_SRCS)cmnds/cmd_send.c
 OBKM_SRC  += $(OBK_SRCS)cmnds/cmd_script.c
 OBKM_SRC  += $(OBK_SRCS)cmnds/cmd_simulatorOnly.c
+OBKM_SRC  += $(OBK_SRCS)cmnds/cmd_auth.c
 OBKM_SRC  += $(OBK_SRCS)cmnds/cmd_tasmota.c
 OBKM_SRC  += $(OBK_SRCS)cmnds/cmd_tcp.c
 OBKM_SRC  += $(OBK_SRCS)cmnds/cmd_test.c
