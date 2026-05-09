@@ -177,6 +177,7 @@
     <ClCompile Include="src\bitmessage\bitmessage_read.c" />
     <ClCompile Include="src\bitmessage\bitmessage_write.c" />
     <ClCompile Include="src\cJSON\cJSON.c" />
+    <ClCompile Include="src\cmnds\cmd_auth.c" />
     <ClCompile Include="src\cmnds\cmd_berry.c" />
     <ClCompile Include="src\cmnds\cmd_channels.c" />
     <ClCompile Include="src\cmnds\cmd_enums.c" />
@@ -420,6 +421,7 @@
     <ClCompile Include="src\httpserver\json_interface.c" />
     <ClCompile Include="src\httpserver\new_http.c" />
     <ClCompile Include="src\httpserver\rest_interface.c" />
+    <ClCompile Include="src\crypto\jwt_verify.c" />
     <ClCompile Include="src\i2c\drv_i2c_lcd_pcf8574t.c" />
     <ClCompile Include="src\i2c\drv_i2c_main.c" />
     <ClCompile Include="src\i2c\drv_i2c_mcp23017.c" />
