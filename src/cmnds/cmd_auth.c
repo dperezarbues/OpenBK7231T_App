@@ -8,6 +8,8 @@
 #if MQTT_USE_TLS
 #include "../crypto/jwt_verify.h"
 #include "../driver/drv_ntp.h"
+#endif
+#if HTTP_USE_TLS
 #include "../httpserver/http_tls_server.h"
 #endif
 
@@ -104,7 +106,7 @@ static commandResult_t CMD_SendGetAuth(const void *context, const char *cmd, con
 }
 
 static commandResult_t CMD_SetHTTPSCert(const void *context, const char *cmd, const char *args, int cmdFlags) {
-#if MQTT_USE_TLS
+#if HTTP_USE_TLS
 	Tokenizer_TokenizeString(args, TOKENIZER_ALLOW_QUOTES | TOKENIZER_ALLOW_ESCAPING_QUOTATIONS);
 	if (Tokenizer_CheckArgsCountAndPrintWarning(cmd, 1))
 		return CMD_RES_NOT_ENOUGH_ARGUMENTS;
@@ -120,13 +122,13 @@ static commandResult_t CMD_SetHTTPSCert(const void *context, const char *cmd, co
 	ADDLOG_INFO(LOG_FEATURE_CMD, "setHTTPSCert: saved to LFS. Reboot to activate HTTPS.");
 	return CMD_RES_OK;
 #else
-	ADDLOG_ERROR(LOG_FEATURE_CMD, "setHTTPSCert: requires MQTT_USE_TLS build");
+	ADDLOG_ERROR(LOG_FEATURE_CMD, "setHTTPSCert: requires HTTP_USE_TLS build");
 	return CMD_RES_ERROR;
 #endif
 }
 
 static commandResult_t CMD_SetHTTPSKey(const void *context, const char *cmd, const char *args, int cmdFlags) {
-#if MQTT_USE_TLS
+#if HTTP_USE_TLS
 	Tokenizer_TokenizeString(args, TOKENIZER_ALLOW_QUOTES | TOKENIZER_ALLOW_ESCAPING_QUOTATIONS);
 	if (Tokenizer_CheckArgsCountAndPrintWarning(cmd, 1))
 		return CMD_RES_NOT_ENOUGH_ARGUMENTS;
@@ -142,7 +144,7 @@ static commandResult_t CMD_SetHTTPSKey(const void *context, const char *cmd, con
 	ADDLOG_INFO(LOG_FEATURE_CMD, "setHTTPSKey: saved to LFS. Reboot to activate HTTPS.");
 	return CMD_RES_OK;
 #else
-	ADDLOG_ERROR(LOG_FEATURE_CMD, "setHTTPSKey: requires MQTT_USE_TLS build");
+	ADDLOG_ERROR(LOG_FEATURE_CMD, "setHTTPSKey: requires HTTP_USE_TLS build");
 	return CMD_RES_ERROR;
 #endif
 }
