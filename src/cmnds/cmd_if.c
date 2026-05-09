@@ -745,6 +745,16 @@ const char *CMD_ExpandConstantString(const char *s, const char *stop, char *out,
 		strcpy_safe(out, res, outLen);
 		return ret;
 	}
+	ret = strCompareBound(s, "${Version}", stop, false);
+	if (ret) {
+		strcpy_safe(out, USER_SW_VER, outLen);
+		return ret;
+	}
+	ret = strCompareBound(s, "$version", stop, false);
+	if (ret) {
+		strcpy_safe(out, USER_SW_VER, outLen);
+		return ret;
+	}
 	return false;
 }
 
