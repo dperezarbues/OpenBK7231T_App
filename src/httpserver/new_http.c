@@ -11,7 +11,7 @@
 #include "../hal/hal_wifi.h"
 #include "../base64/base64.h"
 #include "http_basic_auth.h"
-#if MQTT_USE_TLS
+#if HTTP_USE_TLS
 #include "mbedtls/ssl.h"
 #endif
 
@@ -683,7 +683,7 @@ void setupAllWB2SPinsAsButtons()
 /* TLS-aware send: uses mbedtls_ssl_write when request->tls_ssl is set (HTTPS),
  * otherwise falls back to the plain socket send(). */
 static int http_send(http_request_t *request, const char *buf, int len) {
-#if MQTT_USE_TLS
+#if HTTP_USE_TLS
 	if (request->tls_ssl) {
 		int written = 0;
 		while (written < len) {

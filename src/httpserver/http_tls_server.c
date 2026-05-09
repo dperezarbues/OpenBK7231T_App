@@ -1,6 +1,6 @@
 #include "../new_common.h"
 
-#if MQTT_USE_TLS
+#if HTTP_USE_TLS
 
 #include "lwip/sockets.h"
 #include "lwip/ip_addr.h"
@@ -322,4 +322,4 @@ void HTTPS_Start(void) {
 	}
 }
 
-#endif /* MQTT_USE_TLS */
+#endif /* HTTP_USE_TLS */

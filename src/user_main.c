@@ -29,7 +29,7 @@
 #include "new_cfg.h"
 #include "logging/logging.h"
 #include "httpserver/http_tcp_server.h"
-#if MQTT_USE_TLS
+#if HTTP_USE_TLS
 #include "httpserver/http_tls_server.h"
 #endif
 #include "httpserver/rest_interface.h"
@@ -1629,8 +1629,10 @@ void Main_Init_After_Delay()
 #endif
 		HTTPServer_Start();
 		ADDLOGF_DEBUG("Started http tcp server");
-#if MQTT_USE_TLS
+#if HTTP_USE_TLS
 		HTTPS_Start();
+#endif
+#if MQTT_USE_TLS
 	}
 #endif
 
