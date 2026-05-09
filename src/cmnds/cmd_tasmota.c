@@ -484,6 +484,34 @@ static commandResult_t cmnd_Password2(const void * context, const char *cmd, con
 	CFG_SetWiFiPass2(Tokenizer_GetArg(0));
 	return CMD_RES_OK;
 }
+
+#if ENABLE_LITTLEFS
+#include "../httpserver/http_ip_filter.h"
+static commandResult_t cmnd_addAllowedIP(const void *context, const char *cmd, const char *args, int cmdFlags) {
+	if (!args || !*args) return CMD_RES_NOT_ENOUGH_ARGUMENTS;
+	byte *existing = LFS_ReadFile(IP_FILTER_FILE);
+	char buf[512];
+	if (existing && strlen((char *)existing) > 0) {
+		snprintf(buf, sizeof(buf), "%s,%s", (char *)existing, args);
+	} else {
+		snprintf(buf, sizeof(buf), "%s", args);
+	}
+	if (existing) os_free(existing);
+	LFS_WriteFile(IP_FILTER_FILE, (byte *)buf, strlen(buf), false);
+	IPFilter_Reload();
+	return CMD_RES_OK;
+}
+static commandResult_t cmnd_clearAllowedIPs(const void *context, const char *cmd, const char *args, int cmdFlags) {
+	LFS_WriteFile(IP_FILTER_FILE, (byte *)"", 0, false);
+	IPFilter_Reload();
+	return CMD_RES_OK;
+}
+static commandResult_t cmnd_reloadAllowedIPs(const void *context, const char *cmd, const char *args, int cmdFlags) {
+	IPFilter_Reload();
+	return CMD_RES_OK;
+}
+#endif /* ENABLE_LITTLEFS */
+
 int taslike_commands_init(){
 	//cmddetail:{"name":"power","args":"[OnorOfforToggle]",
 	//cmddetail:"descr":"Tasmota-style POWER command. Should work for both LEDs and relay-based devices. You can write POWER0, POWER1, etc to access specific relays.",
@@ -555,6 +583,23 @@ int taslike_commands_init(){
 	//cmddetail:"fn":"cmnd_Password2","file":"cmnds/cmd_tasmota.c","requires":"",
 	//cmddetail:"examples":"Password2 mysecretpass"}
 	CMD_RegisterCommand("Password2", cmnd_Password2, NULL);
+#if ENABLE_LITTLEFS
+	//cmddetail:{"name":"addAllowedIP","args":"[IPAddress]",
+	//cmddetail:"descr":"Add an IP address or prefix (e.g. 192.168.1.42 or 192.168.1.) to the HTTP allow-list stored in LittleFS. Empty list = allow all.",
+	//cmddetail:"fn":"cmnd_addAllowedIP","file":"cmnds/cmd_tasmota.c","requires":"",
+	//cmddetail:"examples":"addAllowedIP 192.168.1.100"}
+	CMD_RegisterCommand("addAllowedIP", cmnd_addAllowedIP, NULL);
+	//cmddetail:{"name":"clearAllowedIPs","args":"",
+	//cmddetail:"descr":"Clear the HTTP IP allow-list, allowing connections from all IPs again.",
+	//cmddetail:"fn":"cmnd_clearAllowedIPs","file":"cmnds/cmd_tasmota.c","requires":"",
+	//cmddetail:"examples":"clearAllowedIPs"}
+	CMD_RegisterCommand("clearAllowedIPs", cmnd_clearAllowedIPs, NULL);
+	//cmddetail:{"name":"reloadAllowedIPs","args":"",
+	//cmddetail:"descr":"Reload the HTTP IP allow-list from LittleFS without rebooting.",
+	//cmddetail:"fn":"cmnd_reloadAllowedIPs","file":"cmnds/cmd_tasmota.c","requires":"",
+	//cmddetail:"examples":"reloadAllowedIPs"}
+	CMD_RegisterCommand("reloadAllowedIPs", cmnd_reloadAllowedIPs, NULL);
+#endif
 
 	// those are stubs, they are handled elsewhere so we can have Tasmota style replies
 
