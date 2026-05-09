@@ -133,8 +133,14 @@ can verify the device's identity without a separate handshake.
 
 Falls back to a plain GET if no device token is stored.
 
+Supports HTTPS URLs (`https://...`) when built with the `HTTP_USE_TLS` flag.
+If a CA certificate is stored via `setHTTPSCA`, the orchestrator server
+certificate is verified. Without a CA cert, TLS still encrypts the channel
+but skips certificate verification (TOFU-style bootstrap).
+
 ```
 sendGetAuth http://192.168.1.100:3000/$ShortName cmd
+sendGetAuth https://nas.local/$ShortName cmd
 sendGetAuth http://nas/$ShortName?fw=$Version cmd
 ```
 
@@ -170,6 +176,31 @@ days until it expires. Does **not** print the token value.
 ```
 getDeviceToken
 ```
+
+### `setHTTPSCA "<pem>"`
+
+Stores the CA certificate (full X.509 PEM, `-----BEGIN CERTIFICATE-----`) used
+to verify the orchestrator's TLS certificate when `sendGetAuth` connects over
+HTTPS. Run once during initial provisioning; persisted to LittleFS as
+`https_ca.pem`.
+
+This is distinct from `setCAKey` (which stores an EC public key for JWT
+verification). For Step CA, export the root CA certificate:
+
+```bash
+step ca root > root_ca.pem
+```
+
+Then provision the device:
+
+```
+setHTTPSCA "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n"
+```
+
+If no CA cert is stored, `sendGetAuth https://...` still encrypts the channel
+via TLS but skips certificate verification (logs a warning).
+
+Requires `HTTP_USE_TLS` build flag.
 
 ---
 

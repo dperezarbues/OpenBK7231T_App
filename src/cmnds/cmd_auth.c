@@ -149,6 +149,28 @@ static commandResult_t CMD_SetHTTPSKey(const void *context, const char *cmd, con
 #endif
 }
 
+static commandResult_t CMD_SetHTTPSCA(const void *context, const char *cmd, const char *args, int cmdFlags) {
+#if HTTP_USE_TLS
+	Tokenizer_TokenizeString(args, TOKENIZER_ALLOW_QUOTES | TOKENIZER_ALLOW_ESCAPING_QUOTATIONS);
+	if (Tokenizer_CheckArgsCountAndPrintWarning(cmd, 1))
+		return CMD_RES_NOT_ENOUGH_ARGUMENTS;
+	const char *pem = Tokenizer_GetArg(0);
+	if (!pem || !*pem) {
+		ADDLOG_ERROR(LOG_FEATURE_CMD, "setHTTPSCA: empty PEM");
+		return CMD_RES_NOT_ENOUGH_ARGUMENTS;
+	}
+	if (!LFS_WriteFile(HTTPS_CA_FILE, (const byte *)pem, strlen(pem), false)) {
+		ADDLOG_ERROR(LOG_FEATURE_CMD, "setHTTPSCA: failed to write '%s'", HTTPS_CA_FILE);
+		return CMD_RES_ERROR;
+	}
+	ADDLOG_INFO(LOG_FEATURE_CMD, "setHTTPSCA: saved to LFS. Used for outbound HTTPS cert verification.");
+	return CMD_RES_OK;
+#else
+	ADDLOG_ERROR(LOG_FEATURE_CMD, "setHTTPSCA: requires HTTP_USE_TLS build");
+	return CMD_RES_ERROR;
+#endif
+}
+
 int CMD_InitAuthCommands(void) {
 	//cmddetail:{"name":"setCAKey","args":"[PEM]",
 	//cmddetail:"descr":"Stores the Step CA public key (EC P-256 PEM) used to verify inbound JWTs for web UI access. Persisted to LittleFS as 'ca_pubkey'. Requires MQTT_USE_TLS build.",
@@ -176,9 +198,14 @@ int CMD_InitAuthCommands(void) {
 	//cmddetail:"examples":"setHTTPSCert \"-----BEGIN CERTIFICATE-----\\n...\\n-----END CERTIFICATE-----\\n\""}
 	CMD_RegisterCommand("setHTTPSCert", CMD_SetHTTPSCert, NULL);
 	//cmddetail:{"name":"setHTTPSKey","args":"[PEM]",
-	//cmddetail:"descr":"Stores the server private key (PEM) in LittleFS as 'https_key.pem'. Supported: EC P-256 (ECDHE-ECDSA) or RSA (ECDHE-RSA). Reboot to activate the HTTPS server on port 443. Requires MQTT_USE_TLS build.",
-	//cmddetail:"fn":"CMD_SetHTTPSKey","file":"cmnds/cmd_auth.c","requires":"MQTT_USE_TLS",
+	//cmddetail:"descr":"Stores the server private key (PEM) in LittleFS as 'https_key.pem'. Supported: EC P-256 (ECDHE-ECDSA) or RSA (ECDHE-RSA). Reboot to activate the HTTPS server on port 443. Requires HTTP_USE_TLS build.",
+	//cmddetail:"fn":"CMD_SetHTTPSKey","file":"cmnds/cmd_auth.c","requires":"HTTP_USE_TLS",
 	//cmddetail:"examples":"setHTTPSKey \"-----BEGIN EC PRIVATE KEY-----\\n...\\n-----END EC PRIVATE KEY-----\\n\""}
 	CMD_RegisterCommand("setHTTPSKey", CMD_SetHTTPSKey, NULL);
+	//cmddetail:{"name":"setHTTPSCA","args":"[PEM]",
+	//cmddetail:"descr":"Stores the CA certificate (full X.509 PEM) used to verify the orchestrator's TLS certificate on outbound HTTPS connections (sendGetAuth https://...). Without this, connections proceed without cert verification. Requires HTTP_USE_TLS build.",
+	//cmddetail:"fn":"CMD_SetHTTPSCA","file":"cmnds/cmd_auth.c","requires":"HTTP_USE_TLS",
+	//cmddetail:"examples":"setHTTPSCA \"-----BEGIN CERTIFICATE-----\\n...\\n-----END CERTIFICATE-----\\n\""}
+	CMD_RegisterCommand("setHTTPSCA", CMD_SetHTTPSCA, NULL);
 	return 0;
 }

@@ -98,6 +98,7 @@ typedef struct {
 #define HTTPREQUEST_FLAG_FREE_POST_CONTENT_TYPE	16
 #define HTTPREQUEST_FLAG_FREE_RESPONSEBUF	32
 #define HTTPREQUEST_FLAG_FREE_CMDONDONE			64
+#define HTTPREQUEST_FLAG_FREE_CA_CRT			128
 
 typedef struct httprequest_t_tag{
     int state;

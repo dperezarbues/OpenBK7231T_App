@@ -11,6 +11,9 @@
 #include "../cmnds/cmd_public.h"
 #include "../logging/logging.h"
 #include "http_client.h"
+#if HTTP_USE_TLS
+#include "../httpserver/http_tls_server.h"
+#endif
 
 #if ENABLE_SEND_POSTANDGET
 
@@ -973,6 +976,9 @@ void httpclient_freeMemory(httprequest_t *request)
 	if (request->flags & HTTPREQUEST_FLAG_FREE_CMDONDONE) {
 		free((void*)request->cmdToRun);
 	}
+	if (request->flags & HTTPREQUEST_FLAG_FREE_CA_CRT) {
+		free((void*)request->ca_crt);
+	}
 	if (request->flags & HTTPREQUEST_FLAG_FREE_RESPONSEBUF) {
 		free((void*)request->client_data.response_buf);
 	}
@@ -1323,6 +1329,23 @@ int HTTPClient_Async_SendGet(const char *url_in, const char *tgFile, const char 
 	request->port = 80;//HTTP_PORT;
 	request->method = HTTPCLIENT_GET;
 	request->timeout = 10000;
+#if HTTP_USE_TLS
+	if (!strncmp(url, "https://", 8) || !strncmp(url, "HTTPS://", 8)) {
+		request->port = 443;
+		byte *ca_data = LFS_ReadFile(HTTPS_CA_FILE);
+		if (ca_data) {
+			request->ca_crt = (const char *)ca_data;
+			request->flags |= HTTPREQUEST_FLAG_FREE_CA_CRT;
+			ADDLOG_INFO(LOG_FEATURE_HTTP_CLIENT, "HTTPS: loaded CA cert from %s", HTTPS_CA_FILE);
+		} else {
+			/* No CA cert — connect with TLS but skip server cert verification */
+			request->ca_crt = "";
+			ADDLOG_ERROR(LOG_FEATURE_HTTP_CLIENT,
+			             "HTTPS: %s not found; connecting without cert verification",
+			             HTTPS_CA_FILE);
+		}
+	}
+#endif
 	if (tgFile && *tgFile) {
 		client_data->response_buf = HTTPClient_Test_Malloc(HTTPCLIENT_TEST_FAIL_SENDGET_RESPONSEBUF_ALLOC, 2048);
 		if (client_data->response_buf == 0) {

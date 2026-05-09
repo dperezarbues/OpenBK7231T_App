@@ -6,6 +6,8 @@
 #define HTTPS_SERVER_PORT  443
 #define HTTPS_CERT_FILE    "https_cert.pem"
 #define HTTPS_KEY_FILE     "https_key.pem"
+/* CA certificate for outbound HTTPS client verification (PEM, full X.509 cert) */
+#define HTTPS_CA_FILE      "https_ca.pem"
 
 /* Returns 1 if both cert and key files exist in LittleFS */
 int  HTTPS_HasCertAndKey(void);

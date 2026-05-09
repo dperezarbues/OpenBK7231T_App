@@ -13,6 +13,171 @@
 #include "lwip/netdb.h"
 #endif
 
+#if HTTP_USE_TLS
+#include "mbedtls/ssl.h"
+#include "mbedtls/entropy.h"
+#include "mbedtls/ctr_drbg.h"
+#include "mbedtls/x509_crt.h"
+
+typedef struct {
+	int                      fd;
+	mbedtls_ssl_context      ssl;
+	mbedtls_ssl_config       conf;
+	mbedtls_x509_crt         ca_cert;
+	mbedtls_ctr_drbg_context ctr_drbg;
+	mbedtls_entropy_context  entropy;
+} tls_ctx_t;
+
+static int tls_bio_send(void *ctx, const unsigned char *buf, size_t len) {
+	int fd  = *(int *)ctx;
+	int ret = send(fd, (const char *)buf, (int)len, 0);
+	if (ret < 0) return MBEDTLS_ERR_SSL_SEND_FAILED;
+	return ret;
+}
+
+static int tls_bio_recv(void *ctx, unsigned char *buf, size_t len) {
+	int fd  = *(int *)ctx;
+	int ret = recv(fd, (char *)buf, (int)len, 0);
+	if (ret == 0) return MBEDTLS_ERR_SSL_PEER_CLOSE_NOTIFY;
+	if (ret < 0)  return MBEDTLS_ERR_SSL_RECV_FAILED;
+	return ret;
+}
+
+static int connect_tls(utils_network_pt pNetwork) {
+	uintptr_t tcp_fd = HAL_TCP_Establish(pNetwork->pHostAddress, pNetwork->port);
+	if (!tcp_fd) return -1;
+
+	tls_ctx_t *ctx = os_malloc(sizeof(tls_ctx_t));
+	if (!ctx) {
+		lwip_close((int)tcp_fd);
+		return -1;
+	}
+	memset(ctx, 0, sizeof(*ctx));
+	ctx->fd = (int)tcp_fd;
+
+	mbedtls_ssl_init(&ctx->ssl);
+	mbedtls_ssl_config_init(&ctx->conf);
+	mbedtls_x509_crt_init(&ctx->ca_cert);
+	mbedtls_ctr_drbg_init(&ctx->ctr_drbg);
+	mbedtls_entropy_init(&ctx->entropy);
+
+	int ret = mbedtls_ctr_drbg_seed(&ctx->ctr_drbg, mbedtls_entropy_func,
+	                                 &ctx->entropy, NULL, 0);
+	if (ret != 0) {
+		ADDLOG_ERROR(LOG_FEATURE_HTTP_CLIENT, "TLS: rng seed failed -0x%04x", -ret);
+		goto fail;
+	}
+
+	ret = mbedtls_ssl_config_defaults(&ctx->conf, MBEDTLS_SSL_IS_CLIENT,
+	                                  MBEDTLS_SSL_TRANSPORT_STREAM,
+	                                  MBEDTLS_SSL_PRESET_DEFAULT);
+	if (ret != 0) {
+		ADDLOG_ERROR(LOG_FEATURE_HTTP_CLIENT, "TLS: config defaults failed -0x%04x", -ret);
+		goto fail;
+	}
+
+	mbedtls_ssl_conf_rng(&ctx->conf, mbedtls_ctr_drbg_random, &ctx->ctr_drbg);
+
+	if (pNetwork->ca_crt && pNetwork->ca_crt_len > 0) {
+		/* PEM parser requires a NUL terminator; ca_crt_len = strlen so +1 includes it */
+		ret = mbedtls_x509_crt_parse(&ctx->ca_cert,
+		                             (const unsigned char *)pNetwork->ca_crt,
+		                             (size_t)pNetwork->ca_crt_len + 1);
+		if (ret == 0) {
+			mbedtls_ssl_conf_ca_chain(&ctx->conf, &ctx->ca_cert, NULL);
+			mbedtls_ssl_conf_authmode(&ctx->conf, MBEDTLS_SSL_VERIFY_REQUIRED);
+			ADDLOG_INFO(LOG_FEATURE_HTTP_CLIENT, "TLS: server cert verification enabled");
+		} else {
+			ADDLOG_ERROR(LOG_FEATURE_HTTP_CLIENT,
+			             "TLS: ca_crt parse failed -0x%04x; skipping verification", -ret);
+			mbedtls_ssl_conf_authmode(&ctx->conf, MBEDTLS_SSL_VERIFY_NONE);
+		}
+	} else {
+		ADDLOG_ERROR(LOG_FEATURE_HTTP_CLIENT, "TLS: no CA cert provided; skipping verification");
+		mbedtls_ssl_conf_authmode(&ctx->conf, MBEDTLS_SSL_VERIFY_NONE);
+	}
+
+	if (mbedtls_ssl_setup(&ctx->ssl, &ctx->conf) != 0) {
+		ADDLOG_ERROR(LOG_FEATURE_HTTP_CLIENT, "TLS: ssl_setup failed");
+		goto fail;
+	}
+
+	mbedtls_ssl_set_hostname(&ctx->ssl, pNetwork->pHostAddress);
+	mbedtls_ssl_set_bio(&ctx->ssl, &ctx->fd, tls_bio_send, tls_bio_recv, NULL);
+
+	while ((ret = mbedtls_ssl_handshake(&ctx->ssl)) != 0) {
+		if (ret != MBEDTLS_ERR_SSL_WANT_READ && ret != MBEDTLS_ERR_SSL_WANT_WRITE) {
+			ADDLOG_ERROR(LOG_FEATURE_HTTP_CLIENT, "TLS: handshake failed -0x%04x", -ret);
+			goto fail;
+		}
+	}
+
+	ADDLOG_INFO(LOG_FEATURE_HTTP_CLIENT, "TLS: connected to %s:%u",
+	            pNetwork->pHostAddress, pNetwork->port);
+	pNetwork->handle = (uintptr_t)ctx;
+	return 0;
+
+fail:
+	mbedtls_ssl_free(&ctx->ssl);
+	mbedtls_ssl_config_free(&ctx->conf);
+	mbedtls_x509_crt_free(&ctx->ca_cert);
+	mbedtls_ctr_drbg_free(&ctx->ctr_drbg);
+	mbedtls_entropy_free(&ctx->entropy);
+	lwip_close(ctx->fd);
+	os_free(ctx);
+	return -1;
+}
+
+static int32_t read_tls(utils_network_pt pNetwork, char *buf, uint32_t len,
+                        uint32_t timeout_ms) {
+	(void)timeout_ms;
+	tls_ctx_t *ctx = (tls_ctx_t *)pNetwork->handle;
+	int ret = mbedtls_ssl_read(&ctx->ssl, (unsigned char *)buf, len);
+	if (ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE)
+		return 0;
+	if (ret <= 0) {
+		ADDLOG_ERROR(LOG_FEATURE_HTTP_CLIENT, "TLS: read error -0x%04x", -ret);
+		return -1;
+	}
+	return ret;
+}
+
+static int32_t write_tls(utils_network_pt pNetwork, const char *buf, uint32_t len,
+                         uint32_t timeout_ms) {
+	(void)timeout_ms;
+	tls_ctx_t *ctx = (tls_ctx_t *)pNetwork->handle;
+	uint32_t written = 0;
+	while (written < len) {
+		int ret = mbedtls_ssl_write(&ctx->ssl,
+		                            (const unsigned char *)buf + written,
+		                            len - written);
+		if (ret == MBEDTLS_ERR_SSL_WANT_READ || ret == MBEDTLS_ERR_SSL_WANT_WRITE)
+			continue;
+		if (ret < 0) {
+			ADDLOG_ERROR(LOG_FEATURE_HTTP_CLIENT, "TLS: write error -0x%04x", -ret);
+			return -1;
+		}
+		written += ret;
+	}
+	return (int32_t)written;
+}
+
+static int disconnect_tls(utils_network_pt pNetwork) {
+	tls_ctx_t *ctx = (tls_ctx_t *)pNetwork->handle;
+	if (!ctx) return -1;
+	mbedtls_ssl_close_notify(&ctx->ssl);
+	mbedtls_ssl_free(&ctx->ssl);
+	mbedtls_ssl_config_free(&ctx->conf);
+	mbedtls_x509_crt_free(&ctx->ca_cert);
+	mbedtls_ctr_drbg_free(&ctx->ctr_drbg);
+	mbedtls_entropy_free(&ctx->entropy);
+	lwip_close(ctx->fd);
+	os_free(ctx);
+	pNetwork->handle = 0;
+	return 0;
+}
+#endif /* HTTP_USE_TLS */
+
 uintptr_t HAL_TCP_Establish(const char *host, uint16_t port)
 {
     struct addrinfo hints;
@@ -309,38 +474,41 @@ static int connect_tcp(utils_network_pt pNetwork)
 
 int utils_net_read(utils_network_pt pNetwork, char *buffer, uint32_t len, uint32_t timeout_ms)
 {
-    if (NULL == pNetwork->ca_crt) { //TCP connection
-        return read_tcp(pNetwork, buffer, len, timeout_ms);
-    }
-
-    return 0;
+#if HTTP_USE_TLS
+    if (pNetwork->ca_crt != NULL)
+        return read_tls(pNetwork, buffer, len, timeout_ms);
+#endif
+    return read_tcp(pNetwork, buffer, len, timeout_ms);
 }
 
 
 int utils_net_write(utils_network_pt pNetwork, const char *buffer, uint32_t len, uint32_t timeout_ms)
 {
-    if (NULL == pNetwork->ca_crt) { //TCP connection
-        return write_tcp(pNetwork, buffer, len, timeout_ms);
-    }
-    return 0;
+#if HTTP_USE_TLS
+    if (pNetwork->ca_crt != NULL)
+        return write_tls(pNetwork, buffer, len, timeout_ms);
+#endif
+    return write_tcp(pNetwork, buffer, len, timeout_ms);
 }
 
 
 int iotx_net_disconnect(utils_network_pt pNetwork)
 {
-    if (NULL == pNetwork->ca_crt) { //TCP connection
-        return disconnect_tcp(pNetwork);
-    }
-    return 0;
+#if HTTP_USE_TLS
+    if (pNetwork->ca_crt != NULL)
+        return disconnect_tls(pNetwork);
+#endif
+    return disconnect_tcp(pNetwork);
 }
 
 
 int iotx_net_connect(utils_network_pt pNetwork)
 {
-    if (NULL == pNetwork->ca_crt) { //TCP connection
-        return connect_tcp(pNetwork);
-    }
-    return 0;
+#if HTTP_USE_TLS
+    if (pNetwork->ca_crt != NULL)
+        return connect_tls(pNetwork);
+#endif
+    return connect_tcp(pNetwork);
 }
 
 
