@@ -29,7 +29,9 @@
 #include "new_cfg.h"
 #include "logging/logging.h"
 #include "httpserver/http_tcp_server.h"
+
 #include "httpserver/http_ip_filter.h"
+#include "httpserver/http_dns_server.h"
 #include "httpserver/rest_interface.h"
 #include "mqtt/new_mqtt.h"
 #include "hal/hal_ota.h"
@@ -685,6 +687,7 @@ void Main_ConnectToWiFiNow() {
 	const char* wifi_ssid, * wifi_pass;
 
 	g_bOpenAccessPointMode = 0;
+	CaptivePortalDNS_Stop();
 	CheckForSSID12_Switch();
 	wifi_ssid = CFG_GetWiFiSSIDX();
 	wifi_pass = CFG_GetWiFiPassX();
@@ -1009,6 +1012,7 @@ void Main_OnEverySecond()
 		{
 			HAL_SetupWiFiOpenAccessPoint(CFG_GetDeviceName());
 			g_bOpenAccessPointMode = 1;
+			CaptivePortalDNS_Start();
 		}
 	}
 

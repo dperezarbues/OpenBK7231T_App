@@ -11,6 +11,7 @@
 #include "../hal/hal_wifi.h"
 #include "../base64/base64.h"
 #include "http_basic_auth.h"
+#include "http_dns_server.h"
 
 // define the feature ADDLOGF_XXX will use
 #define LOG_FEATURE LOG_FEATURE_HTTP
@@ -936,6 +937,19 @@ int HTTP_ProcessPacket(http_request_t *request)
 	{
 		ADDLOG_ERROR(LOG_FEATURE_HTTP, "HTTP packet with auth fail");
 		return 0;
+	}
+
+	/* Captive portal: in AP mode redirect everything except the WiFi config
+	 * page itself to /cfg_wifi so phones get the setup page automatically. */
+	if (Main_IsOpenAccessPointMode()) {
+		/* Let the actual config URLs through so the user can save settings. */
+		bool isCfgPage = http_checkUrlBase(urlStr, "cfg_wifi")
+		              || http_checkUrlBase(urlStr, "cfg_wifi_set");
+		if (!isCfgPage) {
+			poststr(request, "HTTP/1.1 302 Found\r\nLocation: /cfg_wifi\r\nConnection: close\r\n\r\n");
+			poststr(request, NULL);
+			return request->replylen;
+		}
 	}
 
 #if ENABLE_HTTP_OVERRIDE
