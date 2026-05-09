@@ -124,6 +124,50 @@ void LN882H_ApplyPowerSave(int bOn) {
 }
 #endif
 
+#if defined(PLATFORM_BEKEN)
+extern int bk_wlan_power_save_set_level(BK_PS_LEVEL level);
+
+/* Returns true if any driver that is incompatible with RF/MCU sleep is active.
+ * Pin-role checks work at any time; DRV_IsRunning checks require startDriver
+ * to have been called first. */
+static bool BK_IsPowerSaveSensitiveDriverActive(void)
+{
+	// BL0937 and HLW8112: interrupt-driven pulses — MCU sleep breaks measurement
+	// and RF sleep causes PSU ripple-current stress on the electrolytic capacitor.
+	if (PIN_FindPinIndexForRole(IOR_BL0937_CF, -1) != -1
+		|| PIN_FindPinIndexForRole(IOR_BL0937_CF1, -1) != -1
+		|| PIN_FindPinIndexForRole(IOR_BL0937_SEL, -1) != -1
+		|| PIN_FindPinIndexForRole(IOR_BL0937_SEL_n, -1) != -1
+		|| PIN_FindPinIndexForRole(IOR_HLW8112_SCSN, -1) != -1
+		|| PIN_FindPinIndexForRole(IOR_IRRecv, -1) != -1
+		|| PIN_FindPinIndexForRole(IOR_IRSend, -1) != -1
+		|| PIN_FindPinIndexForRole(IOR_IRRecv_nPup, -1) != -1
+		|| PIN_FindPinIndexForRole(IOR_RCRecv, -1) != -1
+		|| PIN_FindPinIndexForRole(IOR_RCRecv_nPup, -1) != -1)
+		return true;
+	// BL0942/BL0942SPI: UART/SPI-based so MCU sleep is fine, but RF sleep still
+	// causes the same PSU capacitor ripple-current stress. Detected via running
+	// state (no dedicated pin roles); requires startDriver to precede PowerSave.
+	if (DRV_IsRunning("BL0942") || DRV_IsRunning("BL0942SPI"))
+		return true;
+	return false;
+}
+
+/* Called by BL0942 init to retroactively disable RF sleep if PowerSave was
+ * already enabled before startDriver BL0942 ran. */
+void CMD_ReapplyPowerSaveIfNeeded(void)
+{
+	if (g_powersave && BK_IsPowerSaveSensitiveDriverActive()) {
+		ADDLOG_INFO(LOG_FEATURE_CMD,
+			"PowerSave: power-metering driver started while PowerSave was on — "
+			"disabling RF sleep to protect PSU hardware");
+		bk_wlan_power_save_set_level(0);
+	}
+}
+#else
+void CMD_ReapplyPowerSaveIfNeeded(void) { /* no-op on non-Beken platforms */ }
+#endif /* PLATFORM_BEKEN */
+
 static commandResult_t CMD_PowerSave(const void* context, const char* cmd, const char* args, int cmdFlags) {
 	int bOn = 1;
 	Tokenizer_TokenizeString(args, 0);
@@ -136,37 +180,10 @@ static commandResult_t CMD_PowerSave(const void* context, const char* cmd, const
 #else
 	ADDLOG_INFO(LOG_FEATURE_CMD, "CMD_PowerSave: will set to %i", bOn);
 #endif
-	
 
 #if defined(PLATFORM_BEKEN)
-	extern int bk_wlan_power_save_set_level(BK_PS_LEVEL level);
-
-	inline bool isBKSensitiveDriversRunning()
-	{
-		// Pin-role check (works before startDriver):
-		// BL0937 and HLW8112 use interrupt-driven pulses; MCU sleep breaks them
-		// and RF sleep causes PSU ripple-current stress on the electrolytic cap.
-		if (PIN_FindPinIndexForRole(IOR_BL0937_CF, -1) != -1
-			|| PIN_FindPinIndexForRole(IOR_BL0937_CF1, -1) != -1
-			|| PIN_FindPinIndexForRole(IOR_BL0937_SEL, -1) != -1
-			|| PIN_FindPinIndexForRole(IOR_BL0937_SEL_n, -1) != -1
-			|| PIN_FindPinIndexForRole(IOR_HLW8112_SCSN, -1) != -1
-			|| PIN_FindPinIndexForRole(IOR_IRRecv, -1) != -1
-			|| PIN_FindPinIndexForRole(IOR_IRSend, -1) != -1
-			|| PIN_FindPinIndexForRole(IOR_IRRecv_nPup, -1) != -1
-			|| PIN_FindPinIndexForRole(IOR_RCRecv, -1) != -1
-			|| PIN_FindPinIndexForRole(IOR_RCRecv_nPup, -1) != -1)
-			return true;
-		// Driver-running check (requires startDriver to have been called first):
-		// BL0942/BL0942SPI are UART/SPI-based so MCU sleep is fine, but RF sleep
-		// still causes the same PSU capacitor ripple-current stress.
-		if (DRV_IsRunning("BL0942") || DRV_IsRunning("BL0942SPI"))
-			return true;
-		return false;
-	}
-
 	if (bOn) {
-		if (isBKSensitiveDriversRunning()) {
+		if (BK_IsPowerSaveSensitiveDriverActive()) {
 			// RF sleep causes periodic high-current WiFi wakeup bursts (every ~100ms for DTIM=1)
 			// that stress the PSU capacitor via ripple current. MCU sleep would also break
 			// interrupt-driven and SPI-based power measurement. Disable all sleep modes.
