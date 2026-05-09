@@ -29,6 +29,9 @@
 #include "new_cfg.h"
 #include "logging/logging.h"
 #include "httpserver/http_tcp_server.h"
+#if MQTT_USE_TLS
+#include "httpserver/http_tls_server.h"
+#endif
 #include "httpserver/rest_interface.h"
 #include "mqtt/new_mqtt.h"
 #include "hal/hal_ota.h"
@@ -1623,12 +1626,13 @@ void Main_Init_After_Delay()
 
 #if MQTT_USE_TLS
 	if (!CFG_GetDisableWebServer() || bSafeMode) {
-#endif		
+#endif
 		HTTPServer_Start();
 		ADDLOGF_DEBUG("Started http tcp server");
 #if MQTT_USE_TLS
-	} 
-#endif		
+		HTTPS_Start();
+	}
+#endif
 
 	// only initialise certain things if we are not in AP mode
 	if (!bSafeMode)

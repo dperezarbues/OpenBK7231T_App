@@ -8,6 +8,7 @@
 #if MQTT_USE_TLS
 #include "../crypto/jwt_verify.h"
 #include "../driver/drv_ntp.h"
+#include "../httpserver/http_tls_server.h"
 #endif
 
 static commandResult_t CMD_SetCAKey(const void *context, const char *cmd, const char *args, int cmdFlags) {
@@ -102,6 +103,50 @@ static commandResult_t CMD_SendGetAuth(const void *context, const char *cmd, con
 #endif
 }
 
+static commandResult_t CMD_SetHTTPSCert(const void *context, const char *cmd, const char *args, int cmdFlags) {
+#if MQTT_USE_TLS
+	Tokenizer_TokenizeString(args, TOKENIZER_ALLOW_QUOTES | TOKENIZER_ALLOW_ESCAPING_QUOTATIONS);
+	if (Tokenizer_CheckArgsCountAndPrintWarning(cmd, 1))
+		return CMD_RES_NOT_ENOUGH_ARGUMENTS;
+	const char *pem = Tokenizer_GetArg(0);
+	if (!pem || !*pem) {
+		ADDLOG_ERROR(LOG_FEATURE_CMD, "setHTTPSCert: empty PEM");
+		return CMD_RES_NOT_ENOUGH_ARGUMENTS;
+	}
+	if (!LFS_WriteFile(HTTPS_CERT_FILE, (const byte *)pem, strlen(pem), false)) {
+		ADDLOG_ERROR(LOG_FEATURE_CMD, "setHTTPSCert: failed to write '%s'", HTTPS_CERT_FILE);
+		return CMD_RES_ERROR;
+	}
+	ADDLOG_INFO(LOG_FEATURE_CMD, "setHTTPSCert: saved to LFS. Reboot to activate HTTPS.");
+	return CMD_RES_OK;
+#else
+	ADDLOG_ERROR(LOG_FEATURE_CMD, "setHTTPSCert: requires MQTT_USE_TLS build");
+	return CMD_RES_ERROR;
+#endif
+}
+
+static commandResult_t CMD_SetHTTPSKey(const void *context, const char *cmd, const char *args, int cmdFlags) {
+#if MQTT_USE_TLS
+	Tokenizer_TokenizeString(args, TOKENIZER_ALLOW_QUOTES | TOKENIZER_ALLOW_ESCAPING_QUOTATIONS);
+	if (Tokenizer_CheckArgsCountAndPrintWarning(cmd, 1))
+		return CMD_RES_NOT_ENOUGH_ARGUMENTS;
+	const char *pem = Tokenizer_GetArg(0);
+	if (!pem || !*pem) {
+		ADDLOG_ERROR(LOG_FEATURE_CMD, "setHTTPSKey: empty PEM");
+		return CMD_RES_NOT_ENOUGH_ARGUMENTS;
+	}
+	if (!LFS_WriteFile(HTTPS_KEY_FILE, (const byte *)pem, strlen(pem), false)) {
+		ADDLOG_ERROR(LOG_FEATURE_CMD, "setHTTPSKey: failed to write '%s'", HTTPS_KEY_FILE);
+		return CMD_RES_ERROR;
+	}
+	ADDLOG_INFO(LOG_FEATURE_CMD, "setHTTPSKey: saved to LFS. Reboot to activate HTTPS.");
+	return CMD_RES_OK;
+#else
+	ADDLOG_ERROR(LOG_FEATURE_CMD, "setHTTPSKey: requires MQTT_USE_TLS build");
+	return CMD_RES_ERROR;
+#endif
+}
+
 int CMD_InitAuthCommands(void) {
 	//cmddetail:{"name":"setCAKey","args":"[PEM]",
 	//cmddetail:"descr":"Stores the Step CA public key (EC P-256 PEM) used to verify inbound JWTs for web UI access. Persisted to LittleFS as 'ca_pubkey'. Requires MQTT_USE_TLS build.",
@@ -123,5 +168,15 @@ int CMD_InitAuthCommands(void) {
 	//cmddetail:"fn":"CMD_SendGetAuth","file":"cmnds/cmd_auth.c","requires":"ENABLE_SEND_POSTANDGET",
 	//cmddetail:"examples":"sendGetAuth http://orchestrator.home/$ShortName cmd"}
 	CMD_RegisterCommand("sendGetAuth", CMD_SendGetAuth, NULL);
+	//cmddetail:{"name":"setHTTPSCert","args":"[PEM]",
+	//cmddetail:"descr":"Stores the server TLS certificate (PEM) in LittleFS as 'https_cert.pem'. Can be self-signed. Reboot to activate the HTTPS server on port 443. Requires MQTT_USE_TLS build.",
+	//cmddetail:"fn":"CMD_SetHTTPSCert","file":"cmnds/cmd_auth.c","requires":"MQTT_USE_TLS",
+	//cmddetail:"examples":"setHTTPSCert \"-----BEGIN CERTIFICATE-----\\n...\\n-----END CERTIFICATE-----\\n\""}
+	CMD_RegisterCommand("setHTTPSCert", CMD_SetHTTPSCert, NULL);
+	//cmddetail:{"name":"setHTTPSKey","args":"[PEM]",
+	//cmddetail:"descr":"Stores the server private key (PEM) in LittleFS as 'https_key.pem'. Supported: EC P-256 (ECDHE-ECDSA) or RSA (ECDHE-RSA). Reboot to activate the HTTPS server on port 443. Requires MQTT_USE_TLS build.",
+	//cmddetail:"fn":"CMD_SetHTTPSKey","file":"cmnds/cmd_auth.c","requires":"MQTT_USE_TLS",
+	//cmddetail:"examples":"setHTTPSKey \"-----BEGIN EC PRIVATE KEY-----\\n...\\n-----END EC PRIVATE KEY-----\\n\""}
+	CMD_RegisterCommand("setHTTPSKey", CMD_SetHTTPSKey, NULL);
 	return 0;
 }

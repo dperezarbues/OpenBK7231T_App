@@ -420,6 +420,7 @@
     <ClCompile Include="src\httpserver\http_tcp_server_nonblocking.c" />
     <ClCompile Include="src\httpserver\json_interface.c" />
     <ClCompile Include="src\httpserver\new_http.c" />
+    <ClCompile Include="src\httpserver\http_tls_server.c" />
     <ClCompile Include="src\httpserver\rest_interface.c" />
     <ClCompile Include="src\crypto\jwt_verify.c" />
     <ClCompile Include="src\i2c\drv_i2c_lcd_pcf8574t.c" />

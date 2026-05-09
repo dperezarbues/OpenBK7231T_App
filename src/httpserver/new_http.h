@@ -62,6 +62,9 @@ typedef struct http_request_tag {
 
 	// JWT session cookie to emit in the next Set-Cookie header (NUL = none pending)
 	char pending_cookie[40];
+
+	// When non-NULL this is an mbedtls_ssl_context* and all sends use TLS (HTTPS)
+	void *tls_ssl;
 } http_request_t;
 
 
