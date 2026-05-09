@@ -4,6 +4,7 @@ set(OBKM_SRC
 	${OBK_SRCS}base64/base64.c
 	${OBK_SRCS}bitmessage/bitmessage_read.c
 	${OBK_SRCS}bitmessage/bitmessage_write.c
+	${OBK_SRCS}cmnds/cmd_auth.c
 	${OBK_SRCS}cmnds/cmd_berry.c
 	${OBK_SRCS}cmnds/cmd_channels.c
 	${OBK_SRCS}cmnds/cmd_enums.c
@@ -41,7 +42,9 @@ set(OBKM_SRC
 	${OBK_SRCS}httpserver/new_tcp_server.c
 	${OBK_SRCS}httpserver/json_interface.c
 	${OBK_SRCS}httpserver/new_http.c
+	${OBK_SRCS}httpserver/http_tls_server.c
 	${OBK_SRCS}httpserver/rest_interface.c
+	${OBK_SRCS}crypto/jwt_verify.c
 	${OBK_SRCS}mqtt/new_mqtt_deduper.c
 	${OBK_SRCS}jsmn/jsmn.c
 	${OBK_SRCS}logging/logging.c
