@@ -8,22 +8,31 @@ Commands and features added in this branch on top of the upstream OpenBK7231T fi
 
 ### `PowerSave <0|1>`
 
-Existing command — behaviour fixed for BL0937/HLW8112 devices.
+Existing command — behaviour fixed for BL0937, HLW8112, and BL0942 devices.
 
-**Bug fixed:** calling `PowerSave 1` with a BL0937 or HLW8112 power-measurement driver
-configured previously enabled WiFi RF sleep even though the app believed sleep was off.
+**Bug fixed:** calling `PowerSave 1` with a power-metering driver active previously
+enabled WiFi RF sleep even though the app believed sleep was off.
 RF sleep causes the radio to wake every ~100 ms to check for buffered packets, generating
 periodic 200–400 mA current bursts. The PSU electrolytic capacitor absorbs each spike;
 the ripple-current stress accelerates ageing and causes premature failure.
 
-**If you have BL0937 or HLW8112 configured, always use:**
+**If you have BL0937, HLW8112, BL0942, or BL0942SPI configured, always use:**
 
 ```
 PowerSave 0
 ```
 
-When sensitive drivers are active the firmware now logs a diagnostic message and leaves
+When a protected driver is active the firmware now logs a diagnostic message and leaves
 all sleep modes disabled rather than silently enabling RF sleep.
+
+**Detection method per driver:**
+
+| Driver | Detection | Requirement |
+|---|---|---|
+| BL0937 | Pin roles (CF/CF1/SEL) | Works at any time |
+| HLW8112 | Pin role (SCSN) | Works at any time |
+| BL0942 | `DRV_IsRunning("BL0942")` | `startDriver BL0942` must run before `PowerSave` |
+| BL0942SPI | `DRV_IsRunning("BL0942SPI")` | `startDriver BL0942SPI` must run before `PowerSave` |
 
 ---
 
