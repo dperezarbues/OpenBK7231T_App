@@ -11,6 +11,9 @@
 #include "../hal/hal_wifi.h"
 #include "../base64/base64.h"
 #include "http_basic_auth.h"
+#if MQTT_USE_TLS
+#include "mbedtls/ssl.h"
+#endif
 
 // define the feature ADDLOGF_XXX will use
 #define LOG_FEATURE LOG_FEATURE_HTTP
@@ -677,12 +680,30 @@ void setupAllWB2SPinsAsButtons()
 }
 
 // add some more output safely, sending if necessary.
+/* TLS-aware send: uses mbedtls_ssl_write when request->tls_ssl is set (HTTPS),
+ * otherwise falls back to the plain socket send(). */
+static int http_send(http_request_t *request, const char *buf, int len) {
+#if MQTT_USE_TLS
+	if (request->tls_ssl) {
+		int written = 0;
+		while (written < len) {
+			int ret = mbedtls_ssl_write((mbedtls_ssl_context *)request->tls_ssl,
+				(const unsigned char *)buf + written, len - written);
+			if (ret <= 0) break;
+			written += ret;
+		}
+		return written;
+	}
+#endif
+	return send(request->fd, buf, len, 0);
+}
+
 // call with str == NULL to force send. - can be binary.
 // supply length
 int postany(http_request_t *request, const char *str, int len)
 {
 #if PLATFORM_BL602 || PLATFORM_BEKEN_NEW || PLATFORM_RTL8720D
-	send(request->fd, str, len, 0);
+	http_send(request, str, len);
 	return 0;
 #else
 	int currentlen;
@@ -700,7 +721,7 @@ int postany(http_request_t *request, const char *str, int len)
 		if (request->replylen > 0)
 		{
 			// ADDLOG_ERROR(LOG_FEATURE_HTTP, "postany: send %i", request->replylen);
-			send(request->fd, request->reply, request->replylen, 0);
+			http_send(request, request->reply, request->replylen);
 		}
 		request->reply[0] = 0;
 		request->replylen = 0;
@@ -711,7 +732,7 @@ int postany(http_request_t *request, const char *str, int len)
 	if (currentlen + addlen >= request->replymaxlen)
 	{
 		// ADDLOG_ERROR(LOG_FEATURE_HTTP, "postany: send %i", request->replylen);
-		send(request->fd, request->reply, request->replylen, 0);
+		http_send(request, request->reply, request->replylen);
 		request->reply[0] = 0;
 		request->replylen = 0;
 		currentlen = 0;
@@ -721,11 +742,11 @@ int postany(http_request_t *request, const char *str, int len)
 		if (request->replylen > 0)
 		{
 			// ADDLOG_ERROR(LOG_FEATURE_HTTP, "postany: send %i", request->replylen);
-			send(request->fd, request->reply, request->replylen, 0);
+			http_send(request, request->reply, request->replylen);
 			request->replylen = 0;
 		}
 		// ADDLOG_ERROR(LOG_FEATURE_HTTP, "postany: send %i", (request->replymaxlen - 1));
-		send(request->fd, str, (request->replymaxlen - 1), 0);
+		http_send(request, str, (request->replymaxlen - 1));
 		addlen -= (request->replymaxlen - 1);
 		str += (request->replymaxlen - 1);
 
