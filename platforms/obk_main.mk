@@ -51,6 +51,7 @@ OBKM_SRC  += $(OBK_SRCS)hal/generic/hal_wifi_generic.c
 OBKM_SRC  += $(OBK_SRCS)hal/generic/hal_uart_generic.c
 OBKM_SRC  += $(OBK_SRCS)httpserver/hass.c
 OBKM_SRC  += $(OBK_SRCS)httpserver/http_basic_auth.c
+OBKM_SRC  += $(OBK_SRCS)httpserver/http_ip_filter.c
 OBKM_SRC  += $(OBK_SRCS)httpserver/http_fns.c
 OBKM_SRC  += $(OBK_SRCS)httpserver/http_tcp_server.c
 OBKM_SRC  += $(OBK_SRCS)httpserver/new_tcp_server.c

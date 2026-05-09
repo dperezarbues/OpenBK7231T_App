@@ -36,6 +36,7 @@ set(OBKM_SRC
 	${OBK_SRCS}hal/generic/hal_uart_generic.c
 	${OBK_SRCS}httpserver/hass.c
 	${OBK_SRCS}httpserver/http_basic_auth.c
+	${OBK_SRCS}httpserver/http_ip_filter.c
 	${OBK_SRCS}httpserver/http_fns.c
 	${OBK_SRCS}httpserver/http_tcp_server.c
 	${OBK_SRCS}httpserver/new_tcp_server.c

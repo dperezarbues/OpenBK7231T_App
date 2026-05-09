@@ -5,6 +5,7 @@
 #include "lwip/inet.h"
 #include "../logging/logging.h"
 #include "new_http.h"
+#include "http_ip_filter.h"
 
 #if !NEW_TCP_SERVER
 
@@ -186,6 +187,11 @@ static void tcp_server_thread(beken_thread_arg_t arg)
 #endif
 #endif
 				strcpy(client_ip_str, inet_ntoa(client_addr.sin_addr));
+				if (!IPFilter_IsAllowed(client_ip_str)) {
+					ADDLOG_INFO(LOG_FEATURE_HTTP, "IPFilter: rejected %s", client_ip_str);
+					lwip_close(client_fd);
+					continue;
+				}
 #if DISABLE_SEPARATE_THREAD_FOR_EACH_TCP_CLIENT
 				//ADDLOG_ERROR(LOG_FEATURE_HTTP, "HTTP [single thread] Client %s:%d connected, fd: %d", client_ip_str, client_addr.sin_port, client_fd);
 				// Use main server thread (blocking all other clients)
