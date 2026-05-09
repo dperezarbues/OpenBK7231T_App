@@ -62,6 +62,9 @@ typedef commandResult_t(*commandHandler_t)(const void* context, const char* cmd,
 #define COMMAND_FLAG_SOURCE_TELESENDER	64
 
 extern bool g_powersave;
+/* Called by power-metering driver inits to retroactively disable RF sleep
+ * if PowerSave was enabled before the driver started. No-op on non-Beken. */
+void CMD_ReapplyPowerSaveIfNeeded(void);
 typedef struct command_s command_t;
 
 //

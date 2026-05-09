@@ -341,6 +341,7 @@ void BL0942_UART_Init(void) {
   UART_WriteReg(BL0942_REG_USR_WRPROT, BL0942_USR_WRPROT_DISABLE);
   UART_WriteReg(BL0942_REG_MODE,
     BL0942_MODE_DEFAULT | BL0942_MODE_RMS_UPDATE_SEL_800_MS);
+  CMD_ReapplyPowerSaveIfNeeded();
 }
 #else
 void BL0942_UART_InitEx(int auartindex) {
@@ -369,6 +370,7 @@ void BL0942_UART_Init(void) {
       BL0942_UART_InitEx(UART_PORT_INDEX_1);
     }
   }
+  CMD_ReapplyPowerSaveIfNeeded();
 }
 #endif
 
@@ -429,6 +431,7 @@ void BL0942_SPI_Init(void) {
     SPI_WriteReg(BL0942_REG_USR_WRPROT, BL0942_USR_WRPROT_DISABLE);
     SPI_WriteReg(BL0942_REG_MODE,
                  BL0942_MODE_DEFAULT | BL0942_MODE_RMS_UPDATE_SEL_800_MS);
+    CMD_ReapplyPowerSaveIfNeeded();
 }
 
 void BL0942_SPI_RunEverySecond(void) {
