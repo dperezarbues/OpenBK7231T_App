@@ -59,6 +59,9 @@ typedef struct http_request_tag {
 
 	// user variables used to build JSON data
 	int userCounter;
+
+	// JWT session cookie to emit in the next Set-Cookie header (NUL = none pending)
+	char pending_cookie[40];
 } http_request_t;
 
 

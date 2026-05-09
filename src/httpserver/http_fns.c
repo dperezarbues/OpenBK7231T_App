@@ -3198,7 +3198,7 @@ const char* g_obk_flagNames[] = {
 	"[HTTP] Hide ON/OFF for relays (only red/green buttons)",
 	"[MQTT] Never add GET suffix",
 	"[WiFi] (RTL/BK/BL602) Enhanced fast connect by saving AP data to flash (preferable with Flag 37 & static ip). Quick reset 3 times to connect normally",
-	"error",
+	"[MQTT] Block OTA updates triggered via MQTT (ota_http from MQTT is rejected; web UI and HTTP OTA still work)",
 	"error",
 	"error",
 	"error",

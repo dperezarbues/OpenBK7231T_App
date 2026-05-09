@@ -322,8 +322,14 @@ void http_setup(http_request_t *request, const char *type)
 #endif
 	poststr(request, "\r\n");
 	poststr(request, "Connection: close");
-	poststr(request, "\r\n"); // end headers with double CRLF
 	poststr(request, "\r\n");
+	if (request->pending_cookie[0]) {
+		poststr(request, "Set-Cookie: session=");
+		poststr(request, request->pending_cookie);
+		poststr(request, "; HttpOnly; SameSite=Strict\r\n");
+		request->pending_cookie[0] = '\0';
+	}
+	poststr(request, "\r\n"); // end headers with double CRLF
 }
 void http_setup_gz(http_request_t *request, const char *type)
 {
@@ -334,8 +340,14 @@ void http_setup_gz(http_request_t *request, const char *type)
 	poststr(request, "Content-Encoding: gzip");
 	poststr(request, "\r\n");
 	poststr(request, "Connection: close");
-	poststr(request, "\r\n"); // end headers with double CRLF
 	poststr(request, "\r\n");
+	if (request->pending_cookie[0]) {
+		poststr(request, "Set-Cookie: session=");
+		poststr(request, request->pending_cookie);
+		poststr(request, "; HttpOnly; SameSite=Strict\r\n");
+		request->pending_cookie[0] = '\0';
+	}
+	poststr(request, "\r\n"); // end headers with double CRLF
 }
 
 void http_html_start(http_request_t *request, const char *pagename)
