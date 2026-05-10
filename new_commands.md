@@ -185,6 +185,35 @@ SetFlag 52 1   // enable block
 SetFlag 52 0   // disable block (default)
 ```
 
+### `SetFlag 53 1` — Disable Web UI (`OBK_FLAG_DISABLE_WEB_UI`)
+
+When set, all HTML page endpoints (`/index`, `/cfg_*`, `/about`, `/cmd_tool`,
+`/ota`, etc.) return 404. The `/cm` endpoint and all `/api/*` registered
+callbacks remain fully accessible, so Ansible / openbekenctl provisioning
+continues to work normally. Basic auth still applies.
+
+Use this on fully-provisioned devices to eliminate the browser UI as an
+attack surface while keeping programmatic management intact.
+
+```
+SetFlag 53 1   // disable web UI
+SetFlag 53 0   // enable web UI (default)
+```
+
+### `SetFlag 54 1` — Disable `/cm` endpoint (`OBK_FLAG_DISABLE_CM`)
+
+When set, the `/cm?cmnd=...` endpoint returns 404. Combine with flag 53
+for a "deep freeze" mode where only `/api/*` registered callbacks respond.
+
+**Warning:** setting flag 54 without the IP allowlist (feature 12) in place
+will lock you out of command-based management. Only set this on devices that
+are fully configured and reachable exclusively through the REST API.
+
+```
+SetFlag 54 1   // disable /cm
+SetFlag 54 0   // enable /cm (default)
+```
+
 ---
 
 ## autoexec.bat Template

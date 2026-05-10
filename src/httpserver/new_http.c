@@ -964,6 +964,10 @@ int HTTP_ProcessPacket(http_request_t *request)
 	}
 #endif
 
+	/* OBK_FLAG_DISABLE_WEB_UI: skip all HTML pages, keep /cm and /api/* */
+	if (CFG_HasFlag(OBK_FLAG_DISABLE_WEB_UI))
+		goto obk_api_routes;
+
 	if (http_checkUrlBase(urlStr, ""))
 		return http_fn_empty_url(request);
 
@@ -1055,8 +1059,12 @@ int HTTP_ProcessPacket(http_request_t *request)
 		return http_fn_ota(request);
 	if (http_checkUrlBase(urlStr, "ota_exec"))
 		return http_fn_ota_exec(request);
-	if (http_checkUrlBase(urlStr, "cm"))
+obk_api_routes:
+	if (http_checkUrlBase(urlStr, "cm")) {
+		if (CFG_HasFlag(OBK_FLAG_DISABLE_CM))
+			return http_rest_error(request, HTTP_RESPONSE_NOT_FOUND, "CM endpoint disabled");
 		return http_fn_cm(request);
+	}
 
 #if ENABLE_TIME_PMNTP
 	if (http_checkUrlBase(urlStr, "pmntp"))
