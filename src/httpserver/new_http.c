@@ -940,11 +940,13 @@ int HTTP_ProcessPacket(http_request_t *request)
 	}
 
 	/* Captive portal: in AP mode redirect everything except the WiFi config
-	 * page itself to /cfg_wifi so phones get the setup page automatically. */
+	 * page and API endpoints to /cfg_wifi so phones get the setup page. */
 	if (Main_IsOpenAccessPointMode()) {
-		/* Let the actual config URLs through so the user can save settings. */
+		/* Let config pages, /cm commands and /api/ routes through. */
 		bool isCfgPage = http_checkUrlBase(urlStr, "cfg_wifi")
-		              || http_checkUrlBase(urlStr, "cfg_wifi_set");
+		              || http_checkUrlBase(urlStr, "cfg_wifi_set")
+		              || http_checkUrlBase(urlStr, "cm")
+		              || http_startsWith(urlStr, "api/");
 		if (!isCfgPage) {
 			poststr(request, "HTTP/1.1 302 Found\r\nLocation: /cfg_wifi\r\nConnection: close\r\n\r\n");
 			poststr(request, NULL);
@@ -964,7 +966,7 @@ int HTTP_ProcessPacket(http_request_t *request)
 	}
 #endif
 
-	/* OBK_FLAG_DISABLE_WEB_UI: skip all HTML pages, keep /cm and /api/* */
+	/* OBK_FLAG_DISABLE_WEB_UI: skip all HTML pages, keep /cm and /api/... routes */
 	if (CFG_HasFlag(OBK_FLAG_DISABLE_WEB_UI))
 		goto obk_api_routes;
 
