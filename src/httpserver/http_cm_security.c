@@ -1,5 +1,6 @@
 #include "../new_common.h"
 #include "../logging/logging.h"
+#include "../cmnds/cmd_public.h"
 #include "http_cm_security.h"
 #include "../crypto/hmac_sha256.h"
 #include <stdio.h>
@@ -49,9 +50,9 @@ int CMSec_VerifyHMAC(const char *cmnd, const char *sig_hex)
     }
 
     uint8_t mac[32];
-    hmac_sha256((uint8_t *)g_cm_secret, strlen(g_cm_secret),
-                (uint8_t *)cmnd,        strlen(cmnd),
-                mac);
+    obk_hmac_sha256((uint8_t *)g_cm_secret, strlen(g_cm_secret),
+                    (uint8_t *)cmnd,        strlen(cmnd),
+                    mac);
 
     char computed[65];
     for (int i = 0; i < 32; i++)

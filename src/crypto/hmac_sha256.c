@@ -2,6 +2,9 @@
  * Standalone FIPS 180-4 SHA-256 + RFC 2104 HMAC-SHA256.
  * Public domain — based on Brad Conte's compact implementation.
  * No external dependencies; works on all platforms.
+ *
+ * All symbols prefixed with obk_ to avoid linker conflicts with
+ * SDK-provided SHA-256 implementations (LN882H, XR806, …).
  */
 
 #include "hmac_sha256.h"
@@ -34,7 +37,7 @@ static const uint32_t K[64] = {
     0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
 };
 
-static void sha256_transform(SHA256_CTX *ctx, const uint8_t data[64])
+static void sha256_transform(OBK_SHA256_CTX *ctx, const uint8_t data[64])
 {
     uint32_t a, b, c, d, e, f, g, h, t1, t2, m[64];
     uint32_t i, j;
@@ -63,7 +66,7 @@ static void sha256_transform(SHA256_CTX *ctx, const uint8_t data[64])
     ctx->state[6] += g; ctx->state[7] += h;
 }
 
-void sha256_init(SHA256_CTX *ctx)
+void obk_sha256_init(OBK_SHA256_CTX *ctx)
 {
     ctx->datalen  = 0;
     ctx->bitlen   = 0;
@@ -77,7 +80,7 @@ void sha256_init(SHA256_CTX *ctx)
     ctx->state[7] = 0x5be0cd19;
 }
 
-void sha256_update(SHA256_CTX *ctx, const uint8_t *data, size_t len)
+void obk_sha256_update(OBK_SHA256_CTX *ctx, const uint8_t *data, size_t len)
 {
     for (size_t i = 0; i < len; i++) {
         ctx->data[ctx->datalen++] = data[i];
@@ -89,7 +92,7 @@ void sha256_update(SHA256_CTX *ctx, const uint8_t *data, size_t len)
     }
 }
 
-void sha256_final(SHA256_CTX *ctx, uint8_t hash[32])
+void obk_sha256_final(OBK_SHA256_CTX *ctx, uint8_t hash[32])
 {
     uint32_t i = ctx->datalen;
 
@@ -127,17 +130,17 @@ void sha256_final(SHA256_CTX *ctx, uint8_t hash[32])
 }
 
 /* RFC 2104 HMAC-SHA256 */
-void hmac_sha256(const uint8_t *key, size_t keylen,
-                 const uint8_t *msg, size_t msglen,
-                 uint8_t out[32])
+void obk_hmac_sha256(const uint8_t *key, size_t keylen,
+                     const uint8_t *msg, size_t msglen,
+                     uint8_t out[32])
 {
     uint8_t k[64], ipad[64], opad[64], inner[32];
-    SHA256_CTX ctx;
+    OBK_SHA256_CTX ctx;
 
     if (keylen > 64) {
-        sha256_init(&ctx);
-        sha256_update(&ctx, key, keylen);
-        sha256_final(&ctx, k);
+        obk_sha256_init(&ctx);
+        obk_sha256_update(&ctx, key, keylen);
+        obk_sha256_final(&ctx, k);
         keylen = 32;
     } else {
         memcpy(k, key, keylen);
@@ -149,13 +152,13 @@ void hmac_sha256(const uint8_t *key, size_t keylen,
         opad[i] = k[i] ^ 0x5c;
     }
 
-    sha256_init(&ctx);
-    sha256_update(&ctx, ipad, 64);
-    sha256_update(&ctx, msg, msglen);
-    sha256_final(&ctx, inner);
+    obk_sha256_init(&ctx);
+    obk_sha256_update(&ctx, ipad, 64);
+    obk_sha256_update(&ctx, msg, msglen);
+    obk_sha256_final(&ctx, inner);
 
-    sha256_init(&ctx);
-    sha256_update(&ctx, opad, 64);
-    sha256_update(&ctx, inner, 32);
-    sha256_final(&ctx, out);
+    obk_sha256_init(&ctx);
+    obk_sha256_update(&ctx, opad, 64);
+    obk_sha256_update(&ctx, inner, 32);
+    obk_sha256_final(&ctx, out);
 }

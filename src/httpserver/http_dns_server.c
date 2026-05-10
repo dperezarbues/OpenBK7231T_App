@@ -7,6 +7,14 @@
 
 #define LOG_FEATURE LOG_FEATURE_HTTP
 
+#if WINDOWS || LINUX
+/* The captive-portal DNS server runs its own RTOS thread and uses RTOS types
+ * (xTaskHandle, rtos_create_thread …) that are not available on the simulator.
+ * Provide no-op stubs so the simulator build links cleanly. */
+void CaptivePortalDNS_Start(void) {}
+void CaptivePortalDNS_Stop(void)  {}
+#else /* embedded targets only */
+
 /*
  * Minimal DNS spoof server for captive portal use.
  * Responds to every A-record query with the device's own IP so that
@@ -23,7 +31,7 @@
 #define DNS_BUF_SIZE 512
 
 static volatile int  g_dns_running = 0;
-static xTaskHandle   g_dns_thread  = NULL;
+static beken_thread_t g_dns_thread;
 
 /* Parse a raw 4-byte big-endian IPv4 string "a.b.c.d" into bytes. */
 static int parse_ip(const char *s, uint8_t out[4]) {
@@ -151,3 +159,5 @@ void CaptivePortalDNS_Stop(void) {
     g_dns_running = 0;
     /* thread will exit on next 1-second recv timeout */
 }
+
+#endif /* !WINDOWS && !LINUX */

@@ -14,7 +14,7 @@ static void check_hmac(const uint8_t *key,  size_t keylen,
     uint8_t mac[32];
     char got[65];
 
-    hmac_sha256(key, keylen, data, datalen, mac);
+    obk_hmac_sha256(key, keylen, data, datalen, mac);
     for (int i = 0; i < 32; i++)
         snprintf(got + i*2, 3, "%02x", mac[i]);
     got[64] = '\0';
@@ -56,7 +56,7 @@ void Test_HMAC_SHA256(void)
         const char *cmnd   = "MqttHost 192.168.50.100";
         uint8_t mac[32];
         char hex[65];
-        hmac_sha256((uint8_t *)secret, strlen(secret),
+        obk_hmac_sha256((uint8_t *)secret, strlen(secret),
                     (uint8_t *)cmnd,   strlen(cmnd),
                     mac);
         for (int i = 0; i < 32; i++)
