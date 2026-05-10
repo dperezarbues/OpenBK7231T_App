@@ -284,12 +284,17 @@ match your device.
 
 ```bat
 // ── Power ────────────────────────────────────────────────────────────
-// BL0937/HLW8112 devices: keep sleep disabled to protect the PSU capacitor
+// BL0937/BL0942/HLW8112: RF sleep causes 200-400mA spikes that stress
+// PSU electrolytic capacitors. Always disable on power-metering devices.
+startDriver BL0937   // or BL0942 for switch modules
 PowerSave 0
 
 // ── Security ─────────────────────────────────────────────────────────
 // Reject OTA arriving via MQTT; web UI / console OTA still works
 SetFlag 52 1
+// Disable browser UI pages (/index, /cfg_*, /ota) — keeps /cm and /api/*
+// functional for Ansible/openbekenctl
+SetFlag 53 1
 
 // ── Fallback WiFi ────────────────────────────────────────────────────
 SSID2 "BackupNetwork"
@@ -297,31 +302,39 @@ Password2 "backuppassword"
 
 // ── Orchestrator boot call ───────────────────────────────────────────
 // Server responds with plain OpenBK commands:
-//   MqttHost / MqttPort / MqttUser / MqttPassword / DevName / setDeviceToken ...
-// sendGetAuth appends ?token=<jwt> so the server can identify this device.
-// Use plain sendGet if JWT auth is not set up yet.
-sendGetAuth http://192.168.1.100:3000/$ShortName cmd
+//   MqttHost / MqttPort / MqttUser / MqttPassword / DevName ...
+sendGet http://192.168.1.100:3000/$ShortName cmd
 
 // ── Button recovery actions ──────────────────────────────────────────
-// Double-press → reconnect MQTT
+// Double-press → reconnect MQTT (useful after broker restart)
 addEventHandler OnDblClick 0 MQTTReconnect
 // Long-hold (~5 s) → reconnect WiFi
 addEventHandler OnHoldStart 0 WiFiReconnect
+```
+
+**Hardened variant** — add these after provisioning `/cm` HMAC signing
+(requires Ansible update per `ANSIBLE_UPDATE.md` first):
+
+```bat
+// Require HMAC-SHA256 signature on all /cm requests
+// setCMSecret must be called during provisioning before this flag
+SetFlag 55 1   // POST-only for /cm (no CSRF)
+SetFlag 56 1   // require HMAC signature
 ```
 
 ---
 
 ## Notes
 
-- `setCAKey` and `setDeviceToken` only need to be run **once** during initial
-  provisioning — they persist to LittleFS and are not needed in `autoexec.bat`.
 - `MqttHost`, `MqttUser`, `MqttPassword` are pre-existing Tasmota-compatible
   commands. Add them directly to `autoexec.bat` or let the orchestrator send
   them on boot.
-- `sendGetAuth` requires `ENABLE_SEND_POSTANDGET` build flag (enabled by default
-  in standard builds). JWT token appending additionally requires `MQTT_USE_TLS`.
-- The web UI runs on plain HTTP (port 80). JWT tokens are cryptographically
-  signed so they cannot be forged, but they are visible in transit on the local
-  network. For most home LAN setups this is an acceptable trade-off.
+- `setCMSecret` only needs to be run **once** during provisioning — it persists
+  to LittleFS and does not need to be in `autoexec.bat`.
+- Flags 52 and 53 are idempotent in `autoexec.bat` — safe to set on every boot.
+- Flags 55 and 56 require Ansible to be updated to POST + HMAC before enabling
+  (see `ANSIBLE_UPDATE.md`). Enable these only after verifying Ansible works.
 - Button index `0` refers to the first configured button. Adjust to match your
   device's pin layout if needed.
+- `SetFlag 53 1` (disable web UI) does not affect Ansible/openbekenctl — both
+  use `/cm` and `/api/*` which remain available.
