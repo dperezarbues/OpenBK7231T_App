@@ -38,7 +38,7 @@ void Test_HMAC_SHA256(void)
         const uint8_t key[]  = "Jefe";
         const uint8_t data[] = "what do ya want for nothing?";
         check_hmac(key, sizeof(key) - 1, data, sizeof(data) - 1,
-            "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964a66852");
+            "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843");
     }
 
     /* RFC 4231 Test Case 3 — repeated bytes */

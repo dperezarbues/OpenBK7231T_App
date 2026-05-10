@@ -409,9 +409,13 @@
     <ClCompile Include="src\httpclient\http_client.c" />
     <ClCompile Include="src\httpclient\utils_net.c" />
     <ClCompile Include="src\httpclient\utils_timer.c" />
+    <ClCompile Include="src\crypto\hmac_sha256.c" />
     <ClCompile Include="src\httpserver\hass.c" />
     <ClCompile Include="src\httpserver\http_basic_auth.c" />
+    <ClCompile Include="src\httpserver\http_cm_security.c" />
+    <ClCompile Include="src\httpserver\http_dns_server.c" />
     <ClCompile Include="src\httpserver\http_fns.c" />
+    <ClCompile Include="src\httpserver\http_ip_filter.c" />
     <ClCompile Include="src\httpserver\http_tcp_server.c">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
@@ -828,6 +832,7 @@
     <ClCompile Include="src\selftest\selftest_expressions.c" />
     <ClCompile Include="src\selftest\selftest_flags.c" />
     <ClCompile Include="src\selftest\selftest_hass_discovery.c" />
+    <ClCompile Include="src\selftest\selftest_hmac.c" />
     <ClCompile Include="src\selftest\selftest_http.c" />
     <ClCompile Include="src\selftest\selftest_http_client.c" />
     <ClCompile Include="src\selftest\selftest_if.c" />
@@ -975,7 +980,11 @@
     <ClInclude Include="src\driver\drv_test_drivers.h" />
     <ClInclude Include="src\driver\drv_tm1637.h" />
     <ClInclude Include="src\driver\drv_tm_gn_display_shared.h" />
+    <ClInclude Include="src\crypto\hmac_sha256.h" />
     <ClInclude Include="src\httpserver\http_basic_auth.h" />
+    <ClInclude Include="src\httpserver\http_cm_security.h" />
+    <ClInclude Include="src\httpserver\http_dns_server.h" />
+    <ClInclude Include="src\httpserver\http_ip_filter.h" />
     <ClInclude Include="src\libraries\Arduino-IRremote-mod\src\ac_LG.h" />
     <ClInclude Include="src\libraries\Arduino-IRremote-mod\src\ac_LG.hpp" />
     <ClInclude Include="src\libraries\Arduino-IRremote-mod\src\digitalWriteFast.h" />
