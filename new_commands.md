@@ -214,6 +214,67 @@ SetFlag 54 1   // disable /cm
 SetFlag 54 0   // enable /cm (default)
 ```
 
+### `SetFlag 55 1` — POST-only mode for `/cm` (`OBK_FLAG_CM_POST_ONLY`)
+
+When set, the `/cm` endpoint rejects GET requests with HTTP 405 and only
+accepts POST. This prevents CSRF attacks — a rogue page or device on the
+IoT VLAN cannot forge requests via `<img src="/cm?cmnd=restart">`.
+
+Ansible must be updated to send POST when this flag is enabled.
+See `ANSIBLE_UPDATE.md` for the updated task template.
+
+```
+SetFlag 55 1   // enforce POST-only
+SetFlag 55 0   // allow GET and POST (default)
+```
+
+### `SetFlag 56 1` — Require HMAC-SHA256 signature on `/cm` (`OBK_FLAG_CM_REQUIRE_HMAC`)
+
+When set, every `/cm` request must include a `sig=<hex>` parameter whose value
+is `HMAC-SHA256(secret, cmnd_value)`. Requests with a missing or invalid
+signature are rejected with HTTP 403.
+
+The shared secret is stored in LittleFS and set once with `setCMSecret`.
+
+**Replay note:** HMAC signing verifies authenticity but not freshness — a
+captured request could be replayed. Combine with the IP allowlist (flag/feature 12)
+so only trusted IPs can attempt requests at all.
+
+```
+SetFlag 56 1   // require HMAC signature
+SetFlag 56 0   // no signature required (default)
+```
+
+### `setCMSecret <secret>`
+
+Stores the HMAC-SHA256 shared secret used to sign `/cm` commands.
+Persisted to LittleFS (`cm_hmac_secret`); run **once** during provisioning.
+
+```
+setCMSecret mysupersecret
+setCMSecret "long passphrase with spaces"
+```
+
+Requires `ENABLE_LITTLEFS` (enabled in standard builds).
+
+**Ansible-side signing** — compute the signature before sending:
+
+```bash
+# Shell (provisioning script or Ansible shell module):
+sig=$(printf '%s' "MqttHost 192.168.50.100" | \
+      openssl dgst -sha256 -hmac "mysupersecret" | awk '{print $2}')
+# POST: cmnd=MqttHost+192.168.50.100&sig=<sig>
+```
+
+```python
+# Python (Ansible filter plugin or local_action):
+import hmac, hashlib
+sig = hmac.new(b"mysupersecret", b"MqttHost 192.168.50.100",
+               hashlib.sha256).hexdigest()
+```
+
+See `ANSIBLE_UPDATE.md` for the complete updated playbook tasks.
+
 ---
 
 ## autoexec.bat Template

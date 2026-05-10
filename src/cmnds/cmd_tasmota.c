@@ -487,6 +487,7 @@ static commandResult_t cmnd_Password2(const void * context, const char *cmd, con
 
 #if ENABLE_LITTLEFS
 #include "../httpserver/http_ip_filter.h"
+#include "../httpserver/http_cm_security.h"
 static commandResult_t cmnd_addAllowedIP(const void *context, const char *cmd, const char *args, int cmdFlags) {
 	if (!args || !*args) return CMD_RES_NOT_ENOUGH_ARGUMENTS;
 	byte *existing = LFS_ReadFile(IP_FILTER_FILE);
@@ -508,6 +509,12 @@ static commandResult_t cmnd_clearAllowedIPs(const void *context, const char *cmd
 }
 static commandResult_t cmnd_reloadAllowedIPs(const void *context, const char *cmd, const char *args, int cmdFlags) {
 	IPFilter_Reload();
+	return CMD_RES_OK;
+}
+
+static commandResult_t cmnd_setCMSecret(const void *context, const char *cmd, const char *args, int cmdFlags) {
+	if (!args || !*args) return CMD_RES_NOT_ENOUGH_ARGUMENTS;
+	CMSec_SetSecret(args);
 	return CMD_RES_OK;
 }
 #endif /* ENABLE_LITTLEFS */
@@ -599,6 +606,11 @@ int taslike_commands_init(){
 	//cmddetail:"fn":"cmnd_reloadAllowedIPs","file":"cmnds/cmd_tasmota.c","requires":"",
 	//cmddetail:"examples":"reloadAllowedIPs"}
 	CMD_RegisterCommand("reloadAllowedIPs", cmnd_reloadAllowedIPs, NULL);
+	//cmddetail:{"name":"setCMSecret","args":"[Secret]",
+	//cmddetail:"descr":"Store the HMAC-SHA256 shared secret used to sign /cm commands (OBK_FLAG_CM_REQUIRE_HMAC). Persisted to LittleFS; run once during provisioning.",
+	//cmddetail:"fn":"cmnd_setCMSecret","file":"cmnds/cmd_tasmota.c","requires":"ENABLE_LITTLEFS",
+	//cmddetail:"examples":"setCMSecret mysupersecret"}
+	CMD_RegisterCommand("setCMSecret", cmnd_setCMSecret, NULL);
 #endif
 
 	// those are stubs, they are handled elsewhere so we can have Tasmota style replies

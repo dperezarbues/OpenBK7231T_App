@@ -2,6 +2,7 @@
 #include "http_fns.h"
 #include "../new_pins.h"
 #include "../new_cfg.h"
+#include "http_cm_security.h"
 #include "../hal/hal_ota.h"
 // Commands register, execution API and cmd tokenizer
 #include "../cmnds/cmd_public.h"
@@ -2835,43 +2836,74 @@ void runHTTPCommandInternal(http_request_t* request, const char *cmd) {
 }
 int http_fn_cm(http_request_t* request) {
 	char tmpA[128];
-	char* long_str_alloced = 0;
+	char *heap = NULL;   /* full command when commandLen > sizeof(tmpA)-5 */
+	char *cmd  = NULL;   /* points to tmpA or heap */
 	int commandLen = 0;
 
-	http_setup(request, httpMimeTypeJson);
-	// exec command
-	if (request->method == HTTP_GET) {
+	/* OBK_FLAG_CM_POST_ONLY: reject GET requests */
+	if (CFG_HasFlag(OBK_FLAG_CM_POST_ONLY) && request->method == HTTP_GET) {
+		request->responseCode = 405;
+		http_setup(request, httpMimeTypeJson);
+		poststr(request, "{\"error\":\"Method Not Allowed: POST required\"}");
+		poststr(request, NULL);
+		return 0;
+	}
+
+	/* Extract the command string */
+	if (request->method == HTTP_GET)
 		commandLen = http_getArg(request->url, "cmnd", tmpA, sizeof(tmpA));
-		//ADDLOG_INFO(LOG_FEATURE_HTTP, "Got here (GET) %s;%s;%d", request->url, tmpA, commandLen);
-    } else if (request->method == HTTP_POST || request->method == HTTP_PUT) {
+	else if (request->method == HTTP_POST || request->method == HTTP_PUT)
 		commandLen = http_getRawArg(request->bodystart, "cmnd", tmpA, sizeof(tmpA));
-		//ADDLOG_INFO(LOG_FEATURE_HTTP, "Got here (POST) %s;%s;%d", request->bodystart, tmpA, commandLen);
-    }
+
 	if (commandLen) {
-		if (commandLen > (sizeof(tmpA) - 5)) {
-			commandLen += 8;
-			long_str_alloced = (char*)malloc(commandLen);
-			if (long_str_alloced) {
-				if (request->method == HTTP_GET) {
-					http_getArg(request->url, "cmnd", long_str_alloced, commandLen);
-				} else if (request->method == HTTP_POST || request->method == HTTP_PUT) {
-					http_getRawArg(request->bodystart, "cmnd", long_str_alloced, commandLen);
-				}
-				CMD_ExecuteCommand(long_str_alloced, COMMAND_FLAG_SOURCE_HTTP);
-
-				runHTTPCommandInternal(request, long_str_alloced);
-
-				free(long_str_alloced);
+		if (commandLen > (int)(sizeof(tmpA) - 5)) {
+			/* Command too long for tmpA — allocate a full-size buffer */
+			heap = (char *)malloc(commandLen + 8);
+			if (heap) {
+				if (request->method == HTTP_GET)
+					http_getArg(request->url, "cmnd", heap, commandLen + 8);
+				else if (request->method == HTTP_POST || request->method == HTTP_PUT)
+					http_getRawArg(request->bodystart, "cmnd", heap, commandLen + 8);
+				cmd = heap;
 			}
+		} else {
+			cmd = tmpA;
 		}
-		else {
-			runHTTPCommandInternal(request, tmpA);
+	}
+
+	/* OBK_FLAG_CM_REQUIRE_HMAC: verify HMAC-SHA256(secret, cmnd) before executing */
+	if (cmd && CFG_HasFlag(OBK_FLAG_CM_REQUIRE_HMAC)) {
+		char sig[65];
+		int sigLen = 0;
+		if (request->method == HTTP_GET)
+			sigLen = http_getArg(request->url, "sig", sig, sizeof(sig));
+		else if (request->method == HTTP_POST || request->method == HTTP_PUT)
+			sigLen = http_getRawArg(request->bodystart, "sig", sig, sizeof(sig));
+		if (!sigLen || !CMSec_VerifyHMAC(cmd, sig)) {
+			if (heap) free(heap);
+			request->responseCode = 403;
+			http_setup(request, httpMimeTypeJson);
+			poststr(request, "{\"error\":\"Forbidden: invalid or missing HMAC signature\"}");
+			ADDLOG_ERROR(LOG_FEATURE_HTTP, "/cm: HMAC verification failed");
+			poststr(request, NULL);
+			return 0;
+		}
+	}
+
+	http_setup(request, httpMimeTypeJson);
+
+	if (cmd) {
+		if (heap) {
+			/* Long command path: run both the direct executor and the response builder */
+			CMD_ExecuteCommand(cmd, COMMAND_FLAG_SOURCE_HTTP);
+			runHTTPCommandInternal(request, cmd);
+			free(heap);
+		} else {
+			runHTTPCommandInternal(request, cmd);
 		}
 	}
 
 	poststr(request, NULL);
-
-
 	return 0;
 }
 

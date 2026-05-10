@@ -1402,8 +1402,10 @@ typedef struct pinsState_s {
 #define OBK_FLAG_MQTT_BLOCK_OTA						52
 #define OBK_FLAG_DISABLE_WEB_UI						53
 #define OBK_FLAG_DISABLE_CM							54
+#define OBK_FLAG_CM_POST_ONLY						55
+#define OBK_FLAG_CM_REQUIRE_HMAC					56
 
-#define OBK_TOTAL_FLAGS 55
+#define OBK_TOTAL_FLAGS 57
 
 #define LOGGER_FLAG_MQTT_DEDUPER					1
 #define LOGGER_FLAG_POWER_SAVE						2

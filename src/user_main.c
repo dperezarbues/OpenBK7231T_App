@@ -32,6 +32,7 @@
 
 #include "httpserver/http_ip_filter.h"
 #include "httpserver/http_dns_server.h"
+#include "httpserver/http_cm_security.h"
 #include "httpserver/rest_interface.h"
 #include "mqtt/new_mqtt.h"
 #include "hal/hal_ota.h"
@@ -1622,6 +1623,7 @@ void Main_Init_After_Delay()
 	if (!CFG_GetDisableWebServer() || bSafeMode) {
 #endif		
 		IPFilter_Init();
+		CMSec_Init();
 		HTTPServer_Start();
 		ADDLOGF_DEBUG("Started http tcp server");
 #if MQTT_USE_TLS

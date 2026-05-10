@@ -39,6 +39,8 @@ set(OBKM_SRC
 
 	${OBK_SRCS}httpserver/http_ip_filter.c
 	${OBK_SRCS}httpserver/http_dns_server.c
+	${OBK_SRCS}httpserver/http_cm_security.c
+	${OBK_SRCS}crypto/hmac_sha256.c
 	${OBK_SRCS}httpserver/http_fns.c
 	${OBK_SRCS}httpserver/http_tcp_server.c
 	${OBK_SRCS}httpserver/new_tcp_server.c

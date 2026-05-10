@@ -54,6 +54,8 @@ OBKM_SRC  += $(OBK_SRCS)httpserver/http_basic_auth.c
 
 OBKM_SRC  += $(OBK_SRCS)httpserver/http_ip_filter.c
 OBKM_SRC  += $(OBK_SRCS)httpserver/http_dns_server.c
+OBKM_SRC  += $(OBK_SRCS)httpserver/http_cm_security.c
+OBKM_SRC  += $(OBK_SRCS)crypto/hmac_sha256.c
 OBKM_SRC  += $(OBK_SRCS)httpserver/http_fns.c
 OBKM_SRC  += $(OBK_SRCS)httpserver/http_tcp_server.c
 OBKM_SRC  += $(OBK_SRCS)httpserver/new_tcp_server.c

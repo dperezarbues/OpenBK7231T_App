@@ -280,6 +280,7 @@ void Win_DoUnitTests()
 	Test_Demo_ExclusiveRelays();
 	Test_MultiplePinsOnChannel();
 	Test_Flags();
+	Test_HMAC_SHA256();
 #ifndef LINUX
 	// TODO: fix on Linux
 	Test_DHT();
