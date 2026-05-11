@@ -1669,6 +1669,9 @@ void Main_Init()
 #endif
 	// on windows, we don't want to remember commands from previous session
 	CMD_FreeAllCommands();
+	// reset AP mode state so each SIM_ClearOBK starts clean
+	g_bOpenAccessPointMode = 0;
+	g_openAP = 0;
 #endif
 
 	// do things we want to happen immediately on boot
